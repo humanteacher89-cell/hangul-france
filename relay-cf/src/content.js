@@ -8,7 +8,10 @@
 // 로그인 5번 틀리면 15분 잠김(아이디별·접속 주소별). 사진은 한 장 1.8MB까지(관리자 페이지가 1600px JPEG로 줄여 올린다).
 // 시드(seed-fr.js, 2026-10-07): 공개 자료 조사로 모은 학교 홈페이지·책 글·TV 영상·링크를 저장소의 비어 있는 칸에만 한 번 넣는다.
 //   관리자 페이지에서 고친 값은 건드리지 않고, 시드 version을 올려 다시 배포하면 그때 비어 있는 칸만 다시 채운다.
-// 2026-10-09: map 'xr' = 가상융합교육 지도(my-3d-world/xr/, 관리자 페이지 xr/admin/). 같은 계정·같은 저장소.
+// 2026-10-09: map 'xr' = 가상융합교육 지도(my-3d-world/xr/, 관리자 페이지 xr/admin/). 같은 저장소(Durable Object)지만 **계정·로그인은 map마다 따로**
+//   (10-09 밤 휴먼쌤 "프랑스랑 관리자페이지는 분리해줘"). 관리 요청의 영역(realm) = ?map= (없으면 fr). xr 계정은 users·sess 표에 이름 앞 'xr:'를
+//   붙여 저장한다(아이디에 ':'는 못 들어가 fr 계정과 겹치지 않음). 다른 영역의 토큰은 401. 첫 관리자 설정 코드도 영역마다: ADMIN_SETUP_HASH(fr)·
+//   ADMIN_SETUP_HASH_XR(xr), 쓴 표시는 meta 'setupUsed'(fr)·'setupUsed:xr'.
 //   문서 'xr/hall/<관 id>' = { text: { "경로": "글" }, media: { "<교과 id>": { book, tv, album, links } } }. 경로는 로비 설정(rooms.<관>)의 글 자리
 //   (예 principal.lines, zones[0].line). 로비가 열릴 때 /api/content?map=xr 의 halls.<관>.text 를 설정 위에 덮는다. 사진은 imgs(school = 관 id).
 
@@ -134,6 +137,10 @@ function cleanKey(v) {
 }
 const idOf = v => { const s = String(v ?? ''); if (!/^[a-z0-9_-]{2,24}$/.test(s)) throw new E(400, 'id'); return s; };
 const mapOf = url => { const m = url.searchParams.get('map') || 'fr'; if (!MAPS[m]) throw new E(400, 'map'); return m; };
+// 계정 영역(realm) = 관리 요청의 map. 저장 이름(users.name·sess.name) = fr이면 아이디 그대로, 그 밖은 '<map>:아이디'
+const ukey = (realm, name) => realm === 'fr' ? name : realm + ':' + name;
+const splitKey = k => { k = String(k); const i = k.indexOf(':'); return i < 0 ? { realm: 'fr', name: k } : { realm: k.slice(0, i), name: k.slice(i + 1) }; };
+const usedKey = realm => realm === 'fr' ? 'setupUsed' : 'setupUsed:' + realm;
 function sniff(b) {
   if (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) return 'image/jpeg';
   if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) return 'image/png';
@@ -208,11 +215,11 @@ export class Content {
         if (p.startsWith('/api/img/') && m === 'GET') return this.img(H, p.slice('/api/img/'.length));
         throw new E(404, 'notfound');
       }
-      const r = p.slice('/api/admin/'.length);
-      if (r === 'state' && m === 'GET') return this.out(H, { ready: this.adminCount() > 0, setup: this.setupOpen() });
-      if (r === 'setup' && m === 'POST') return this.out(H, await this.setup(req));
-      if (r === 'login' && m === 'POST') return this.out(H, await this.login(req));
-      const me = await this.auth(req);
+      const r = p.slice('/api/admin/'.length), realm = mapOf(url);   // 영역(fr·xr)마다 계정이 따로
+      if (r === 'state' && m === 'GET') return this.out(H, { ready: this.adminCount(realm) > 0, setup: this.setupOpen(realm) });
+      if (r === 'setup' && m === 'POST') return this.out(H, await this.setup(req, realm));
+      if (r === 'login' && m === 'POST') return this.out(H, await this.login(req, realm));
+      const me = await this.auth(req, realm);
       if (!me) throw new E(401, 'auth');
       if (r === 'me' && m === 'GET') return this.out(H, this.who(me));
       if (r === 'logout' && m === 'POST') { this.run('DELETE FROM sess WHERE h = ?', me.h); return this.out(H, { ok: true }); }
@@ -288,10 +295,11 @@ export class Content {
   bump(map) { this.setMeta('v:' + map, (+(this.meta('v:' + map) || 0)) + 1); }
 
   // ── 계정·로그인 ──
-  adminCount() { return this.row("SELECT COUNT(*) AS n FROM users WHERE role = 'admin'").n; }
-  setupHash() { const h = String(this.env.ADMIN_SETUP_HASH || '').trim().toLowerCase(); return /^[0-9a-f]{64}$/.test(h) ? h : ''; }
-  setupOpen() { const h = this.setupHash(); return !!h && this.meta('setupUsed') !== h; }
-  getUser(name) { return this.row('SELECT * FROM users WHERE name = ?', name); }
+  // 계정 함수의 name/uk는 저장 이름(fr: 아이디, xr: 'xr:아이디'). 밖으로 내보낼 때만 splitKey로 아이디를 뗀다
+  adminCount(realm) { return this.rows("SELECT name FROM users WHERE role = 'admin'").filter(u => splitKey(u.name).realm === realm).length; }
+  setupHash(realm) { const h = String(this.env[realm === 'fr' ? 'ADMIN_SETUP_HASH' : 'ADMIN_SETUP_HASH_' + realm.toUpperCase()] || '').trim().toLowerCase(); return /^[0-9a-f]{64}$/.test(h) ? h : ''; }
+  setupOpen(realm) { const h = this.setupHash(realm); return !!h && this.meta(usedKey(realm)) !== h; }
+  getUser(uk) { return this.row('SELECT * FROM users WHERE name = ?', uk); }
   who(me) { return { user: me.name, role: me.role, schools: me.schools }; }
   lockCheck(k) {
     const r = this.row('SELECT until FROM fails WHERE k = ?', k);
@@ -311,45 +319,46 @@ export class Content {
       else this.run('INSERT INTO users (name, role, schools, salt, hash, at, last) VALUES (?, ?, ?, ?, ?, ?, 0)', name, role, JSON.stringify(schools), salt, hash, now);
     } else if (u) this.run('UPDATE users SET role = ?, schools = ? WHERE name = ?', role, JSON.stringify(schools), name);
   }
-  async issue(name) {
+  async issue(uk) {
     const token = rand(32), now = Date.now();
-    this.run('INSERT INTO sess (h, name, exp, at) VALUES (?, ?, ?, ?)', await sha(token), name, now + SESSION_MS, now);
+    this.run('INSERT INTO sess (h, name, exp, at) VALUES (?, ?, ?, ?)', await sha(token), uk, now + SESSION_MS, now);
     this.run('DELETE FROM sess WHERE exp < ?', now);
     // 한 계정의 로그인은 최근 10개까지
-    this.run('DELETE FROM sess WHERE name = ? AND h NOT IN (SELECT h FROM sess WHERE name = ? ORDER BY at DESC LIMIT 10)', name, name);
-    this.run('UPDATE users SET last = ? WHERE name = ?', now, name);
-    const u = this.getUser(name);
-    return { token, user: name, role: u.role, schools: JSON.parse(u.schools || '[]'), exp: now + SESSION_MS };
+    this.run('DELETE FROM sess WHERE name = ? AND h NOT IN (SELECT h FROM sess WHERE name = ? ORDER BY at DESC LIMIT 10)', uk, uk);
+    this.run('UPDATE users SET last = ? WHERE name = ?', now, uk);
+    const u = this.getUser(uk);
+    return { token, user: splitKey(uk).name, role: u.role, schools: JSON.parse(u.schools || '[]'), exp: now + SESSION_MS };
   }
-  async setup(req) {
-    const hash = this.setupHash();
+  async setup(req, realm) {
+    const hash = this.setupHash(realm);
     if (!hash) throw new E(503, 'nosetup');
-    if (this.meta('setupUsed') === hash) throw new E(403, 'used');
-    const ipk = 'setup:' + this.ip(req);
+    if (this.meta(usedKey(realm)) === hash) throw new E(403, 'used');
+    const ipk = 'setup:' + realm + ':' + this.ip(req);
     this.lockCheck(ipk);
     const b = await this.body(req);
     const code = String(b.code ?? '').replace(/[\s-]/g, '').toUpperCase();
     if (!same(await sha(code), hash)) { this.fail(ipk); throw new E(403, 'code'); }
-    const name = cleanUser(b.user), key = cleanKey(b.key);
-    await this.putUser(name, 'admin', [], key);
-    this.setMeta('setupUsed', hash);
-    this.run('DELETE FROM sess');
+    const uk = ukey(realm, cleanUser(b.user)), key = cleanKey(b.key);
+    await this.putUser(uk, 'admin', [], key);
+    this.setMeta(usedKey(realm), hash);
+    // 이 영역의 로그인만 모두 풀린다(다른 영역 계정은 그대로)
+    if (realm === 'fr') this.run("DELETE FROM sess WHERE name NOT LIKE '%:%'"); else this.run('DELETE FROM sess WHERE name LIKE ?', realm + ':%');
     this.run('DELETE FROM fails');
-    return this.issue(name);
+    return this.issue(uk);
   }
-  async login(req) {
+  async login(req, realm) {
     const b = await this.body(req);
-    const name = cleanUser(b.user), key = cleanKey(b.key);
-    const ipk = 'ip:' + this.ip(req), uk = 'u:' + name;
+    const uk = ukey(realm, cleanUser(b.user)), key = cleanKey(b.key);
+    const ipk = 'ip:' + this.ip(req), ukk = 'u:' + uk;
     this.lockCheck(ipk);
-    this.lockCheck(uk);
-    const u = this.getUser(name);
+    this.lockCheck(ukk);
+    const u = this.getUser(uk);
     const ok = !!u && same(await sha(u.salt + key), u.hash);
-    if (!ok) { this.fail(ipk); this.fail(uk); throw new E(401, 'login'); }
-    this.run('DELETE FROM fails WHERE k = ?', uk);
-    return this.issue(name);
+    if (!ok) { this.fail(ipk); this.fail(ukk); throw new E(401, 'login'); }
+    this.run('DELETE FROM fails WHERE k = ?', ukk);
+    return this.issue(uk);
   }
-  async auth(req) {
+  async auth(req, realm) {
     const m = (req.headers.get('Authorization') || '').match(/^Bearer ([\w-]{20,80})$/);
     if (!m) return null;
     const h = await sha(m[1]);
@@ -358,15 +367,17 @@ export class Content {
     if (s.exp < Date.now()) { this.run('DELETE FROM sess WHERE h = ?', h); return null; }
     const u = this.getUser(s.name);
     if (!u) return null;
-    return { name: u.name, role: u.role, schools: JSON.parse(u.schools || '[]'), h };
+    const k = splitKey(u.name);
+    if (k.realm !== realm) return null;   // 다른 영역(프랑스 ↔ 가상융합)의 로그인은 쓸 수 없다
+    return { name: k.name, uk: u.name, realm, role: u.role, schools: JSON.parse(u.schools || '[]'), h };
   }
   async password(req, me) {
     const b = await this.body(req);
-    const u = this.getUser(me.name), uk = 'u:' + me.name;
-    this.lockCheck(uk);
-    if (!same(await sha(u.salt + cleanKey(b.key)), u.hash)) { this.fail(uk); throw new E(403, 'password'); }
-    await this.putUser(me.name, u.role, JSON.parse(u.schools || '[]'), cleanKey(b.newKey));
-    this.run('DELETE FROM sess WHERE name = ? AND h != ?', me.name, me.h);
+    const u = this.getUser(me.uk), ukk = 'u:' + me.uk;
+    this.lockCheck(ukk);
+    if (!same(await sha(u.salt + cleanKey(b.key)), u.hash)) { this.fail(ukk); throw new E(403, 'password'); }
+    await this.putUser(me.uk, u.role, JSON.parse(u.schools || '[]'), cleanKey(b.newKey));
+    this.run('DELETE FROM sess WHERE name = ? AND h != ?', me.uk, me.h);
     return { ok: true };
   }
   adminOnly(me) { if (me.role !== 'admin') throw new E(403, 'perm'); }
@@ -374,27 +385,28 @@ export class Content {
   users(me) {
     this.adminOnly(me);
     return { users: this.rows('SELECT name, role, schools, at, last FROM users ORDER BY role, name')
-      .map(u => ({ user: u.name, role: u.role, schools: JSON.parse(u.schools || '[]'), at: u.at, last: u.last })) };
+      .filter(u => splitKey(u.name).realm === me.realm)   // 같은 영역의 계정만
+      .map(u => ({ user: splitKey(u.name).name, role: u.role, schools: JSON.parse(u.schools || '[]'), at: u.at, last: u.last })) };
   }
   async saveUser(req, me) {
     this.adminOnly(me);
     const b = await this.body(req);
-    const name = cleanUser(b.user), role = b.role === 'admin' ? 'admin' : 'editor';
+    const name = cleanUser(b.user), uk = ukey(me.realm, name), role = b.role === 'admin' ? 'admin' : 'editor';
     const schools = role === 'admin' ? [] : [...new Set((Array.isArray(b.schools) ? b.schools : []).map(idOf))].slice(0, 30);
-    const u = this.getUser(name);
+    const u = this.getUser(uk);
     if (!u && !b.key) throw new E(400, 'key');
     if (name === me.name && role !== 'admin') throw new E(400, 'self');
     const key = b.key ? cleanKey(b.key) : null;
-    await this.putUser(name, role, schools, key);
-    if (u && key) this.run('DELETE FROM sess WHERE name = ?', name);   // 비밀번호를 바꾸면 그 계정의 로그인이 풀린다
+    await this.putUser(uk, role, schools, key);
+    if (u && key) this.run('DELETE FROM sess WHERE name = ?', uk);   // 비밀번호를 바꾸면 그 계정의 로그인이 풀린다
     return { ok: true, created: !u };
   }
   delUser(url, me) {
     this.adminOnly(me);
-    const name = cleanUser(url.searchParams.get('user'));
+    const name = cleanUser(url.searchParams.get('user')), uk = ukey(me.realm, name);
     if (name === me.name) throw new E(400, 'self');
-    this.run('DELETE FROM users WHERE name = ?', name);
-    this.run('DELETE FROM sess WHERE name = ?', name);
+    this.run('DELETE FROM users WHERE name = ?', uk);
+    this.run('DELETE FROM sess WHERE name = ?', uk);
     return { ok: true };
   }
 
@@ -460,8 +472,9 @@ export class Content {
   }
   delImg(url, me) {
     const id = String(url.searchParams.get('id') || '');
-    const r = /^[\w-]{10,40}$/.test(id) ? this.row('SELECT school FROM imgs WHERE id = ?', id) : null;
+    const r = /^[\w-]{10,40}$/.test(id) ? this.row('SELECT map, school FROM imgs WHERE id = ?', id) : null;
     if (!r) return { ok: true };
+    if (r.map !== me.realm) throw new E(403, 'perm');   // 다른 영역의 사진은 못 지운다
     this.can(me, r.school);
     this.run('DELETE FROM imgs WHERE id = ?', id);
     return { ok: true };
