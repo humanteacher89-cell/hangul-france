@@ -23,6 +23,9 @@
 - 첫 관리자: `wrangler.jsonc`의 `ADMIN_SETUP_HASH`는 1회용 설정 코드의 SHA-256입니다(코드 자체는 저장소에 없음). 코드를 새로 만들어 이 값을 바꿔 올리면 관리자 비밀번호를 다시 정할 수 있습니다.
 - 무료 한도: Durable Object 하나에 1GB(사진은 800MB까지로 막음), 사진 한 장 1.8MB(관리자 페이지가 1600px JPEG로 줄여 올림), 한 학교 60장.
 
+### 가상융합교육 지도(map `xr`, 2026-10-09)
+휴먼쌤 월드 저장소(`my-3d-world`)의 가상융합교육 지도(`xr/`)도 **같은 서버·같은 계정**을 씁니다(관리자 페이지 `xr/admin/`). `GET /api/content?map=xr` → `halls.<관 id>` = `{ text: { "경로": "글" }, media: { "<교과 id>": { book, tv, album, links } } }`, 저장은 `PUT /api/admin/hall?map=xr&id=<관 id>`. 글 경로는 지도 설정(`rooms.<관>`)의 글 자리(예 `principal.lines`, `zones[0].line`), 칸 300개·한 칸 4,000자까지. 사진은 같은 `imgs` 표(school = 관 id, 교과마다 30장). 계정의 '담당'에 관 id(`concept`·`cases`·…)를 넣으면 그 관만 고칠 수 있습니다. 시험: `tools\cf-xr-test.mjs`.
+
 ### 시드 (`src/seed-fr.js`, 2026-10-07)
 공개 자료 조사로 모은 학교 홈페이지·'책' 소개 글·TV 영상·'더 알아보기' 링크의 기본값입니다. `content.js`의 `seed()`가 `/api/content`를 처음 읽을 때 **비어 있는 칸에만 한 번** 넣고(`meta` 표 `seed:fr`에 적용한 version을 기록), 관리자 페이지에서 저장한 값은 건드리지 않습니다. 값을 고치려면 `seed-fr.js`를 고치고 `version`을 1 올려 올립니다(그때도 비어 있는 칸만 채움). 사진은 아이 얼굴이 나올 수 있어 넣지 않았습니다.
 

@@ -8,11 +8,16 @@
 // 로그인 5번 틀리면 15분 잠김(아이디별·접속 주소별). 사진은 한 장 1.8MB까지(관리자 페이지가 1600px JPEG로 줄여 올린다).
 // 시드(seed-fr.js, 2026-10-07): 공개 자료 조사로 모은 학교 홈페이지·책 글·TV 영상·링크를 저장소의 비어 있는 칸에만 한 번 넣는다.
 //   관리자 페이지에서 고친 값은 건드리지 않고, 시드 version을 올려 다시 배포하면 그때 비어 있는 칸만 다시 채운다.
+// 2026-10-09: map 'xr' = 가상융합교육 지도(my-3d-world/xr/, 관리자 페이지 xr/admin/). 같은 계정·같은 저장소.
+//   문서 'xr/hall/<관 id>' = { text: { "경로": "글" }, media: { "<교과 id>": { book, tv, album, links } } }. 경로는 로비 설정(rooms.<관>)의 글 자리
+//   (예 principal.lines, zones[0].line). 로비가 열릴 때 /api/content?map=xr 의 halls.<관>.text 를 설정 위에 덮는다. 사진은 imgs(school = 관 id).
 
 import SEED from './seed-fr.js';
 
 const ADMIN_ORIGINS = ['https://humanteacher89-cell.github.io'];
-const MAPS = { fr: true };
+const MAPS = { fr: true, xr: true };
+const HALL_TEXT_KEYS = 300, HALL_TEXT_MAX = 4000, HALL_MEDIA_KEYS = 12, HALL_PHOTOS = 30;
+const PATH_RE = /^[A-Za-z][A-Za-z0-9_]{0,30}(\.[A-Za-z][A-Za-z0-9_]{0,30}|\[\d{1,2}\])*$/;
 const MAX_IMG = 1800000;               // SQLite 행 하나 2MB 한도 아래
 const MAX_IMGS_SCHOOL = 60;
 const MAX_IMG_TOTAL = 800 * 1000000;   // 사진 전체 800MB까지(무료 플랜은 Durable Object 하나에 1GB, 계정 전체 5GB)
@@ -84,6 +89,38 @@ function cleanSchool(d) {
   const web = cleanUrl(d.web);
   if (web === null) throw new E(400, 'web');
   return { web };
+}
+// 가상융합 관(map xr): 글 경로 → 글, 교과별 책·TV·사진첩·링크
+function cleanHall(d) {
+  d = d && typeof d === 'object' ? d : {};
+  const text = {};
+  const src = d.text && typeof d.text === 'object' ? d.text : {};
+  let n = 0;
+  for (const k of Object.keys(src)) {
+    if (!PATH_RE.test(k) || k.length > 80) throw new E(400, 'path', { k: String(k).slice(0, 80) });
+    const v = str(src[k], HALL_TEXT_MAX);
+    if (!v) continue;
+    if (++n > HALL_TEXT_KEYS) throw new E(400, 'many');
+    text[k] = v;
+  }
+  const media = {};
+  const ms = d.media && typeof d.media === 'object' ? d.media : {};
+  for (const k of Object.keys(ms).slice(0, HALL_MEDIA_KEYS)) {
+    const id = idOf(k), m = ms[k] && typeof ms[k] === 'object' ? ms[k] : {};
+    const b = m.book || {}, t = m.tv || {}, a = m.album || {};
+    const video = youtube(t.video);
+    if (video === null) throw new E(400, 'video');
+    const doc = {
+      book: { title: str(b.title, 40), sub: str(b.sub, 60), text: str(b.text, HALL_TEXT_MAX) },
+      tv: { title: str(t.title, 60), video },
+      album: { title: str(a.title, 60), photos: (Array.isArray(a.photos) ? a.photos : []).slice(0, HALL_PHOTOS)
+        .map(ph => ({ id: str(ph && ph.id, 40), cap: str(ph && ph.cap, 80) })).filter(ph => /^[\w-]{10,40}$/.test(ph.id)) },
+      links: cleanLinks(m.links)
+    };
+    const any = doc.book.title || doc.book.sub || doc.book.text || doc.tv.title || doc.tv.video || doc.album.title || doc.album.photos.length || doc.links.length;
+    if (any) media[id] = doc;
+  }
+  return { text, media };
 }
 function cleanUser(v) {
   const s = String(v ?? '').normalize('NFC').trim().toLowerCase();
@@ -183,6 +220,7 @@ export class Content {
       if (r === 'content' && m === 'GET') return this.out(H, this.content(mapOf(url), true));
       if (r === 'room' && m === 'PUT') return this.out(H, await this.saveRoom(req, url, me));
       if (r === 'school' && m === 'PUT') return this.out(H, await this.saveSchool(req, url, me));
+      if (r === 'hall' && m === 'PUT') return this.out(H, await this.saveHall(req, url, me));
       if (r === 'img' && m === 'POST') return this.out(H, await this.upload(req, url, me));
       if (r === 'img' && m === 'DELETE') return this.out(H, this.delImg(url, me));
       if (r === 'users' && m === 'GET') return this.out(H, this.users(me));
@@ -230,13 +268,14 @@ export class Content {
   // ── 공개: 내용과 사진 ──
   content(map, admin) {
     this.seed(map);
-    const out = { map, v: +(this.meta('v:' + map) || 0), schools: {}, rooms: {} };
+    const out = { map, v: +(this.meta('v:' + map) || 0), schools: {}, rooms: {}, halls: {} };
     for (const r of this.rows('SELECT k, j, at, by FROM docs WHERE k LIKE ?', map + '/%')) {
       const [, kind, id] = r.k.split('/');
       const d = JSON.parse(r.j);
       if (admin) { d._at = r.at; d._by = r.by; }
       if (kind === 'room') out.rooms[id] = d;
       else if (kind === 'school') out.schools[id] = d;
+      else if (kind === 'hall') out.halls[id] = d;
     }
     return out;
   }
@@ -381,6 +420,25 @@ export class Content {
     this.run('INSERT INTO docs (k, j, at, by) VALUES (?, ?, ?, ?) ON CONFLICT(k) DO UPDATE SET j = excluded.j, at = excluded.at, by = excluded.by',
       `${map}/room/${id}`, JSON.stringify(doc), now, me.name);
     const keep = new Set(doc.album.photos.map(ph => ph.id));
+    for (const r of mine) if (!keep.has(r.id) && now - r.at > ORPHAN_MS) this.run('DELETE FROM imgs WHERE id = ?', r.id);
+    this.bump(map);
+    return { ok: true, doc, at: now };
+  }
+  // 가상융합 관(map xr): 글 덮어쓰기 + 교과별 책·TV·사진첩·링크. 사진은 이 관(school = 관 id)에 올린 것만
+  async saveHall(req, url, me) {
+    const map = mapOf(url), id = idOf(url.searchParams.get('id'));
+    this.can(me, id);
+    const doc = cleanHall(await this.body(req));
+    const mine = this.rows('SELECT id, at FROM imgs WHERE map = ? AND school = ?', map, id);
+    const have = new Set(mine.map(r => r.id)), keep = new Set();
+    for (const k of Object.keys(doc.media)) {
+      const al = doc.media[k].album;
+      al.photos = al.photos.filter(ph => have.has(ph.id));
+      al.photos.forEach(ph => keep.add(ph.id));
+    }
+    const now = Date.now();
+    this.run('INSERT INTO docs (k, j, at, by) VALUES (?, ?, ?, ?) ON CONFLICT(k) DO UPDATE SET j = excluded.j, at = excluded.at, by = excluded.by',
+      `${map}/hall/${id}`, JSON.stringify(doc), now, me.name);
     for (const r of mine) if (!keep.has(r.id) && now - r.at > ORPHAN_MS) this.run('DELETE FROM imgs WHERE id = ?', r.id);
     this.bump(map);
     return { ok: true, doc, at: now };
