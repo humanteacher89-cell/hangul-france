@@ -135,12 +135,13 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--sky);color:var(-
 .fade.on{opacity:1}
 .loading{position:fixed;inset:0;display:grid;place-items:center;background:var(--sky);font-family:var(--font-display);font-size:20px;color:var(--ink);z-index:12;transition:opacity .4s;padding:16px;text-align:center}
 @media (max-width:480px){.btns{flex-direction:column;align-items:flex-end}.toast{top:calc(env(safe-area-inset-top,0px) + 126px)}.chipwrap{max-width:58vw}}
+.chip .credit{margin:3px 0 0;font-size:10.5px;opacity:.55;letter-spacing:.02em}   /* 2026-10-13 휴먼쌤 "표기해줘" */
 @media (prefers-reduced-motion:reduce){.fade,.hint,.loading{transition:none}}
 </style>
 
 <div id="view"></div>
 <div class="top">
-  <div class="chipwrap"><div class="chip"><h1 id="title"></h1><p id="region"></p></div><span id="mpBadge" class="badge" hidden></span></div>
+  <div class="chipwrap"><div class="chip"><h1 id="title"></h1><p id="region"></p><p class="credit">제작·운영 휴먼쌤</p></div><span id="mpBadge" class="badge" hidden></span></div>
   <div class="btns"><button id="btnLobby" class="pill" type="button" hidden></button><button id="btnMap" class="pill" type="button"></button><button id="btnList" class="pill" type="button"></button></div>
 </div>
 <div id="toast" class="toast" hidden></div>
