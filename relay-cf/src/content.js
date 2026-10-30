@@ -72,18 +72,34 @@ function cleanLinks(v) {
     return { label: str(l && l.label, 40), url };
   }).filter(l => l.url);
 }
+// 교장 선생님 퀴즈(2026-10-24): 문제 5개까지, 보기 2~4개, 정답 = 보기 번호(0부터). 문제가 빈 줄은 버린다
+function cleanQuiz(v) {
+  return (Array.isArray(v) ? v : []).slice(0, 5).map((x, i) => {
+    x = x && typeof x === 'object' ? x : {};
+    const q = str(x.q, 120);
+    if (!q) return null;
+    const choices = (Array.isArray(x.choices) ? x.choices : []).slice(0, 4).map(c => str(c, 40));
+    const answer = Number.isInteger(x.answer) ? x.answer : -1;
+    if (choices.length < 2 || choices.some(c => !c) || answer < 0 || answer >= choices.length) throw new E(400, 'quiz', { i });
+    return { q, choices, answer, note: str(x.note, 120) };
+  }).filter(Boolean);
+}
 function cleanRoom(d) {
   d = d && typeof d === 'object' ? d : {};
-  const p = d.principal || {}, b = d.book || {}, a = d.album || {}, t = d.tv || {};
+  const p = d.principal || {}, b = d.book || {}, a = d.album || {}, t = d.tv || {}, bb = d.bbs || {};
   const video = youtube(t.video);
   if (video === null) throw new E(400, 'video');
+  const bbsUrl = cleanUrl(bb.url);
+  if (bbsUrl === null) throw new E(400, 'bbs');
   return {
     boardTitle: str(d.boardTitle, 40), boardLine: str(d.boardLine, 60), welcome: str(d.welcome, 120),
     principal: { name: str(p.name, 20), lines: (Array.isArray(p.lines) ? p.lines : []).map(x => str(x, 200)).filter(Boolean).slice(0, 8) },
+    quiz: cleanQuiz(d.quiz),
     book: { title: str(b.title, 40), sub: str(b.sub, 60), text: str(b.text, 4000) },
     album: { title: str(a.title, 60), photos: (Array.isArray(a.photos) ? a.photos : []).slice(0, MAX_IMGS_SCHOOL)
       .map(ph => ({ id: str(ph && ph.id, 40), cap: str(ph && ph.cap, 80) })).filter(ph => /^[\w-]{10,40}$/.test(ph.id)) },
     tv: { title: str(t.title, 60), video },
+    bbs: { url: bbsUrl },
     links: cleanLinks(d.links)
   };
 }

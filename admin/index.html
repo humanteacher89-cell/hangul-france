@@ -8,7 +8,7 @@
 <title>로비 관리</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
-<link rel="stylesheet" href="admin.css?v=1">
+<link rel="stylesheet" href="admin.css?v=20261024b">
 </head>
 <body>
 <!-- 프랑스 한글학교 로비 관리자 페이지 (2026-10-06, XR개발부). 내용은 Cloudflare 저장소(/api/*)에 두고, 로비가 열릴 때 읽어 간다. -->
@@ -83,10 +83,19 @@
         <label>말 걸면 하는 인사<span class="sub">한 줄에 한 마디, 8줄까지</span><textarea id="fPrLines" rows="4"></textarea></label>
       </div>
       <div class="card">
+        <h2>교장 선생님 퀴즈</h2>
+        <p class="hint">인사가 끝나면 교장 선생님이 이 퀴즈를 내요. 처음에는 모든 학교에 같은 기본 퀴즈 3문제가 들어 있어요. 고치거나 빼고 더해서 우리 학교 퀴즈로 바꿔 주세요. 문제 5개까지, 보기는 2~4개이고 정답 보기 앞의 동그라미를 눌러요. 문제를 모두 빼고 저장하면 기본 퀴즈로 돌아가요.</p>
+        <div id="quiz" class="quiz"></div>
+        <button id="addQuiz" class="ghost" type="button">문제 더하기</button>
+      </div>
+      <div class="card">
         <h2>책</h2>
         <label>제목<input id="fBookTitle" maxlength="40"></label>
         <label>부제<input id="fBookSub" maxlength="60"></label>
         <label>본문<span class="sub">빈 줄로 문단을 나눠요</span><textarea id="fBookText" rows="8" maxlength="4000"></textarea></label>
+        <div class="lab">링크<span class="sub">책 본문 아래 '더 알아보기' 버튼으로 나와요(학교 카페·블로그·신청서 등). 8개까지</span></div>
+        <div id="links" class="links"></div>
+        <button id="addLink" class="ghost" type="button">링크 더하기</button>
       </div>
       <div class="card">
         <h2>사진첩</h2>
@@ -105,10 +114,9 @@
         <div id="tvCheck" class="tvcheck" hidden><img id="tvThumb" alt=""><span id="tvMsg"></span></div>
       </div>
       <div class="card">
-        <h2>링크 모음</h2>
-        <p class="hint">교실 책을 펼치면 '더 알아보기' 버튼으로 나와요(학교 카페·블로그·신청서 등). 8개까지.</p>
-        <div id="links" class="links"></div>
-        <button id="addLink" class="ghost" type="button">링크 더하기</button>
+        <h2>게시판</h2>
+        <label>게시판 주소<input id="fBbsUrl" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://"></label>
+        <p class="hint">교실 왼쪽 아래 게시판을 누르면 이 주소가 새 창으로 열려요(학교 카페·패들렛·밴드 등). 비우면 '아직 게시판 주소가 없어요'가 나와요.</p>
       </div>
       <p class="hint center">칸을 비우고 저장하면 처음 들어 있던 기본 글이 나와요.</p>
     </div>
@@ -116,8 +124,16 @@
 
   <!-- 계정 관리(관리자만) -->
   <section id="users" class="panel" hidden>
-    <div class="bar"><h1>계정</h1><button id="usersBack" class="ghost" type="button">내용 고치기로</button></div>
+    <div class="bar"><h1>계정</h1><button id="usersBack" class="ghost" type="button">돌아가기</button></div>
     <div id="userList" class="userlist"></div>
+    <div class="card">
+      <h2>학교 담당 계정 한꺼번에 만들기</h2>
+      <p class="hint">학교마다 아이디는 학교 영문 이름(paris, opera …), 역할은 그 학교만 고치는 '학교 담당'이에요. 이미 있는 아이디는 건너뛰어요. 첫 비밀번호는 모두 같게 넣고, 각 학교에 알려 주세요.</p>
+      <label>모든 학교의 첫 비밀번호<input id="bulkPw" type="text" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="8자 이상"></label>
+      <div class="row"><button class="btn primary" type="button" id="bulkGo">없는 학교 계정 만들기</button></div>
+      <p class="hint" id="bulkMsg" hidden></p>
+      <p class="err" id="bulkErr" hidden></p>
+    </div>
     <div class="card">
       <h2 id="userFormTitle">새 계정</h2>
       <form id="userForm" autocomplete="off">
@@ -153,6 +169,6 @@
   <button id="btnSave" class="btn primary" type="button">저장하기</button>
 </div>
 <div id="toast" class="toast" hidden></div>
-<script src="admin.js?v=1" charset="utf-8"></script>
+<script src="admin.js?v=20261024b" charset="utf-8"></script>
 </body>
 </html>

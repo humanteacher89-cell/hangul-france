@@ -1,6 +1,7 @@
 // 프랑스 한글학교 로비 — 학교 공간(교실) v0.1 (2026-10-06, XR개발부)
-// 로비 엔진(lobby.js)이 core를 넘겨 주면 교실 세계를 만든다. 내용(교장 인사·회화·책·사진첩·TV)은 lobby.config.js의 rooms[학교 id].
-// 교실 = 북쪽 벽(칠판)·서쪽 벽(창문)·동쪽 벽(포스터), 책상 9개, 정면 교장 NPC, 책·사진첩·TV 구역. 모든 글은 HTML 팝업으로 보여 준다.
+// 로비 엔진(lobby.js)이 core를 넘겨 주면 교실 세계를 만든다. 내용(교장 인사·퀴즈·책·사진첩·TV)은 lobby.config.js의 rooms[학교 id].
+// 10-24부터 교장 선생님은 회화 연습 대신 학교 퀴즈를 낸다(관리자 페이지 '교장 선생님 퀴즈', 없으면 기본 퀴즈). rooms[].situations(회화)는 남겨 두었지만 쓰지 않는다.
+// 교실 = 북쪽 벽(칠판)·서쪽 벽(창문)·동쪽 벽(포스터), 책상 9개, 정면 교장 NPC, 책·사진첩·TV·게시판 구역. 모든 글은 HTML 팝업으로 보여 준다.
 window.LOBBY_ROOM = function (core) {
   'use strict';
   const { THREE, LAND_Y, FONT_D, FONT_B, $, fill, clamp, canvasTex, colored, merge, pill, fitFont, signSprite, addChar, removeChar,
@@ -30,7 +31,7 @@ window.LOBBY_ROOM = function (core) {
       for (let i = 0; i < 30; i++) { g.beginPath(); g.moveTo(Math.random() * w, Math.random() * h); g.lineTo(Math.random() * w, Math.random() * h); g.stroke(); }
       g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#FFFFFF';
       fitFont(g, cfg.boardTitle || '', 'normal', 92, FONT_D, w - 120);
-      g.fillText(cfg.boardTitle || '', w / 2, 112);
+      g.fillText(cfg.boardTitle || '', w / 2, cfg.boardLine ? 112 : 196);   // 한 줄이 없으면 학교 이름을 아래로(PC 화면은 칠판 아랫부분만 보인다)
       g.fillStyle = '#FFE9A8';
       fitFont(g, cfg.boardLine || '', '700', 54, FONT_B, w - 160);
       g.fillText(cfg.boardLine || '', w / 2, 222);
@@ -238,6 +239,25 @@ window.LOBBY_ROOM = function (core) {
       g.beginPath(); g.moveTo(w - 146, h / 2 + 6); g.lineTo(w - 112, h / 2 + 42); g.lineTo(w - 78, h / 2 + 6); g.stroke();
     });
   }
+  // 게시판: 코르크판에 압정으로 꽂은 쪽지들 + 위쪽 '게시판' 글씨
+  function bbsTex() {
+    return canvasTex(512, 320, (g, w, h) => {
+      g.fillStyle = '#C89B66'; g.fillRect(0, 0, w, h);
+      g.fillStyle = 'rgba(120,80,40,0.18)';
+      for (let i = 0; i < 260; i++) g.fillRect((i * 97) % w, (i * 61) % h, 3, 3);
+      g.fillStyle = '#1E2B4A'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      fitFont(g, T.bbsSign || '게시판', 'normal', 64, FONT_D, w - 80); g.fillText(T.bbsSign || '게시판', w / 2, 52);
+      const notes = [[40, 100, '#FFF3B0', -0.06], [190, 108, '#FFFFFF', 0.04], [340, 98, '#CDEBF6', -0.03], [70, 206, '#FAD4DF', 0.05], [230, 212, '#D6F0D2', -0.04], [372, 204, '#FFFFFF', 0.06]];
+      for (const [x, y, c, r] of notes) {
+        g.save(); g.translate(x + 50, y + 42); g.rotate(r);
+        g.fillStyle = 'rgba(0,0,0,0.15)'; g.fillRect(-46, -36, 100, 84);
+        g.fillStyle = c; g.fillRect(-50, -40, 100, 84);
+        g.fillStyle = 'rgba(30,43,74,0.35)'; for (let k = 0; k < 4; k++) g.fillRect(-36, -18 + k * 15, k === 3 ? 44 : 72, 4);
+        g.fillStyle = '#E0483E'; g.beginPath(); g.arc(0, -32, 7, 0, Math.PI * 2); g.fill();
+        g.restore();
+      }
+    });
+  }
   function bookTex(title) {
     return canvasTex(512, 320, (g, w, h) => {
       g.fillStyle = '#FFF9EC'; g.fillRect(0, 0, w, h);
@@ -369,6 +389,24 @@ window.LOBBY_ROOM = function (core) {
     const tv = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 1.3), new THREE.MeshBasicMaterial({ map: screenTex((items.tv || {}).title || T.tvSign) }));
     tv.rotation.y = -Math.PI / 2; tv.position.set(7.86, Y + 1.95, TVZ); scene.add(tv);
     coll.push({ x: 8.2, z: TVZ, r: 1.1 });
+    // 게시판: 서쪽 뒤(TV 맞은편, 화면 왼쪽 아래) 발판 뒤에 세운 코르크판(남쪽 카메라 쪽을 본다). 벽에 걸면 화면 밖이라 세워 둔다.
+    // 누르면 학교가 정한 주소를 새 창으로 연다
+    const BBSZ = 5.0, BBX = -7.4, BBZ = 3.85;
+    const bg = new THREE.Group();
+    bg.position.set(BBX, Y, BBZ); bg.rotation.y = 0.3; scene.add(bg);
+    for (const sx of [-0.85, 0.85]) box(0.08, 1.9, 0.08, '#8C6A4F', sx, 0.95, -0.2, bg);
+    // 위에서 내려다보는 카메라에 판이 보이도록 뒤로 눕힌다
+    const face = new THREE.Group();
+    face.position.set(0, 1.35, -0.1); face.rotation.x = -0.6; bg.add(face);
+    box(1.95, 1.3, 0.08, '#8C6A4F', 0, 0, -0.05, face);
+    const bb = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.13), new THREE.MeshBasicMaterial({ map: bbsTex() }));
+    bb.position.set(0, 0, 0.01); face.add(bb);
+    coll.push({ x: BBX, z: BBZ, r: 0.9 });
+    const openBbs = () => {
+      const url = (items.bbs || {}).url || '';
+      if (/^https?:\/\//.test(url)) window.open(url, '_blank', 'noopener');
+      else showToast(T.bbsNone || '아직 게시판 주소가 없어요');
+    };
 
     // 구역 발판과 이름판
     const padTex = canvasTex(256, 256, (g, w) => {
@@ -383,10 +421,11 @@ window.LOBBY_ROOM = function (core) {
     const doorMat = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.14).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: doorMatTex(), transparent: true, depthWrite: false }));
     doorMat.position.set(0, Y + 0.03, DOORZ); doorMat.renderOrder = 2; scene.add(doorMat);
     const spots = [
-      { id: 'principal', name: pr.name || T.principal, sub: cfg.boardLine || '', btn: T.talk, x: 0, z: -2.35, r: 1.35, go: () => talk(), ch: npc },
+      { id: 'principal', name: pr.name || T.principal, sub: T.quizSub || cfg.boardLine || '', btn: T.talk, x: 0, z: -2.35, r: 1.35, go: () => talk(), ch: npc },
       { id: 'book', name: (items.book || {}).title || T.bookSign, sub: T.bookSign, btn: T.open, x: -6.1, z: -3.0, r: 1.25, go: () => openBook(items.book || {}) },
       { id: 'album', name: (items.album || {}).title || T.albumSign, sub: T.albumSign, btn: T.photos, x: 6.1, z: -3.0, r: 1.25, go: () => openAlbum(items.album || {}) },
       { id: 'tv', name: (items.tv || {}).title || T.tvSign, sub: T.tvSign, btn: T.watch, x: 6.5, z: TVZ, r: 1.25, go: () => openTV(items.tv || {}) },
+      { id: 'bbs', name: T.bbsSign || '게시판', sub: T.bbsSub || '', sign: T.bbsSign || '게시판', btn: T.bbsBtn || '게시판 열기', x: -6.5, z: BBSZ, r: 1.25, go: openBbs },
       { id: 'door', name: T.exitName || '로비로 나가기', sub: T.exitSub || '', btn: T.exitBtn || '나가기', x: 0, z: DOORZ, r: 1.0, pad: doorMat, go: () => { closePop(); core.exit(); } }
     ];
     for (const sp of spots) {
@@ -396,7 +435,7 @@ window.LOBBY_ROOM = function (core) {
         sp.pad = pad;
       }
       if (sp.id !== 'principal' && sp.id !== 'door') {
-        const sg = signSprite(sp.sub, '', { scene, w: 2.6 });
+        const sg = signSprite(sp.sign || sp.sub, '', { scene, w: 2.6 });
         sg.userData.anchor = [sp.x + (sp.x < 0 ? -1.2 : 1.2), Y + 1.9, sp.z - 0.9];
         signs.push(sg);
       }
@@ -586,17 +625,24 @@ window.LOBBY_ROOM = function (core) {
   function showLine() {
     const who = (R.cfg.principal || {}).name || T.principal;
     const last = TALK.i >= TALK.lines.length - 1;
-    const sits = R.cfg.situations || [];
+    const quiz = quizOf();
     const btns = [];
     if (!last) btns.push({ label: T.next, primary: true, go: () => { TALK.i++; showLine(); } });
     else {
-      if (sits.length) btns.push({ label: T.start, primary: true, go: () => startPractice(sits[0]) });
+      if (quiz.steps.length) btns.push({ label: T.quizStart, primary: true, go: () => startPractice(quiz) });
       btns.push({ label: T.later, go: closePop });
     }
     talkUI(who, TALK.lines[TALK.i] || '', btns);
   }
+  // 교장 선생님 퀴즈(2026-10-24): 관리자 페이지에서 학교가 넣은 퀴즈(cfg.quiz), 없으면 기본 퀴즈(lobby.config.js defaultQuiz).
+  // 회화 연습과 같은 화면(showStep·pick)을 쓰려고 상황극 꼴로 바꿔 넘긴다
+  function quizOf() {
+    const own = (R.cfg.quiz || []).filter(x => x && x.q && Array.isArray(x.choices) && x.choices.length >= 2);
+    const list = own.length ? own : (core.defaultQuiz ? core.defaultQuiz(R.school) : []);
+    return { quiz: true, title: T.quizTitle || '', steps: list.map(x => ({ npc: x.q, choices: x.choices.map((c, j) => ({ ko: c, ok: j === x.answer, note: x.note || '' })) })) };
+  }
   function startPractice(sit) {
-    TALK.sit = sit; TALK.step = 0; TALK.wrong = new Set();
+    TALK.sit = sit; TALK.step = 0; TALK.wrong = new Set(); TALK.hit = 0;
     showStep();
   }
   function showStep(feedback, fbKind) {
@@ -606,24 +652,27 @@ window.LOBBY_ROOM = function (core) {
       label: c.ko, choice: true, disabled: TALK.wrong.has(j),
       go: () => pick(j)
     }));
-    talkUI(who, st.npc, btns, { progress: fill(T.progress, { i: TALK.step + 1, n: sit.steps.length }), ask: T.choose, feedback, fbKind, speak: !feedback });
+    talkUI(who, st.npc, btns, { progress: fill(T.progress, { i: TALK.step + 1, n: sit.steps.length }), ask: sit.quiz ? T.quizAsk : T.choose, feedback, fbKind, speak: !feedback });
   }
   function pick(j) {
     const sit = TALK.sit, st = sit.steps[TALK.step], c = st.choices[j];
     if (c.ok) {
       const lastStep = TALK.step >= sit.steps.length - 1;
-      const fb = T.good + (c.note ? ' ' + c.note : '');
+      if (!TALK.wrong.size) TALK.hit++;
+      const fb = (sit.quiz ? T.quizRight : T.good) + (c.note ? ' ' + c.note : '');
       // 고른 말은 '나'의 말로 보여 준다
-      talkUI(T.me, c.ko, [{ label: lastStep ? T.done : T.next, primary: true, go: () => { if (lastStep) finish(); else { TALK.step++; TALK.wrong = new Set(); showStep(); } } }],
+      talkUI(T.me, c.ko, [{ label: lastStep ? (sit.quiz ? T.quizResult : T.done) : T.next, primary: true, go: () => { if (lastStep) finish(); else { TALK.step++; TALK.wrong = new Set(); showStep(); } } }],
         { progress: fill(T.progress, { i: TALK.step + 1, n: sit.steps.length }), feedback: fb, fbKind: 'ok' });
     } else {
       TALK.wrong.add(j);
-      showStep(T.tryAgain + (c.hint ? ' ' + c.hint : ''), 'no');
+      showStep((TALK.sit.quiz ? T.quizWrong : T.tryAgain) + (c.hint ? ' ' + c.hint : ''), 'no');
     }
   }
   function finish() {
-    const who = (R.cfg.principal || {}).name || T.principal;
-    talkUI(who, fill(T.doneBody, { title: TALK.sit.title }), [{ label: T.again, go: () => startPractice(TALK.sit) }, { label: T.close, primary: true, go: closePop }], { feedback: T.done, fbKind: 'ok' });
+    const who = (R.cfg.principal || {}).name || T.principal, sit = TALK.sit;
+    const n = sit.steps.length;
+    const body = sit.quiz ? fill(TALK.hit === n ? T.quizDoneAll : T.quizDoneBody, { n, k: TALK.hit }) : fill(T.doneBody, { title: sit.title });
+    talkUI(who, body, [{ label: T.again, go: () => startPractice(sit) }, { label: T.close, primary: true, go: closePop }], { feedback: sit.quiz ? T.quizDone : T.done, fbKind: 'ok' });
   }
 
   $('popClose').addEventListener('click', closePop);

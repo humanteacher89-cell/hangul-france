@@ -919,7 +919,7 @@
   // ── 학교 공간(교실)으로 들어가기·나오기: 세계를 바꾸고 사람 메시를 옮긴 뒤 카메라를 바로 맞춘다 ──
   const ROOM = window.LOBBY_ROOM ? window.LOBBY_ROOM({
     THREE, LAND_Y, FONT_D, FONT_B, $, fill, clamp, canvasTex, colored, merge, pill, fitFont, signSprite, addChar, removeChar,
-    showCard, hideCard, showToast, T, IS_TOUCH, setPaused: v => { PAUSED = !!v; if (v) { ME.target = null; ME.moving = false; } },
+    showCard, hideCard, showToast, T, IS_TOUCH, defaultQuiz: s => (C.defaultQuiz ? C.defaultQuiz(s, C.schools) : []), setPaused: v => { PAUSED = !!v; if (v) { ME.target = null; ME.moving = false; } },
     vfovRad: () => THREE.MathUtils.degToRad(VFOV), aspect: () => camera.aspect, zoom: () => CAM.zoom,
     exit: () => leaveRoom()
   }) : null;
@@ -1401,6 +1401,7 @@
       const pr = cfg.principal = cfg.principal || {}, dp = d.principal || {};
       if (has(dp.name)) pr.name = dp.name;
       if (Array.isArray(dp.lines) && dp.lines.length) pr.lines = dp.lines.slice(0, 8);
+      if (Array.isArray(d.quiz) && d.quiz.length) cfg.quiz = d.quiz.slice(0, 5);   // 교장 선생님 퀴즈(2026-10-24)
       const it = cfg.items = cfg.items || {};
       const bk = it.book = it.book || {}, db = d.book || {};
       if (has(db.title)) bk.title = db.title;
@@ -1415,6 +1416,8 @@
       const tv = it.tv = it.tv || {}, dt = d.tv || {};
       if (has(dt.title)) tv.title = dt.title;
       if (has(dt.video) && /^https:\/\/www\.youtube\.com\/embed\//.test(dt.video)) { tv.video = dt.video; tv.sample = false; }
+      const dbb = d.bbs || {};
+      if (has(dbb.url) && /^https?:\/\//.test(dbb.url)) (it.bbs = it.bbs || {}).url = dbb.url;
       if (Array.isArray(d.links)) cfg.links = d.links.filter(l => l && /^https?:\/\//.test(l.url)).slice(0, 8);
     }
     CONTENT.loaded = true; CONTENT.v = j.v || 0;

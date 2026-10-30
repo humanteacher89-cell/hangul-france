@@ -7,7 +7,7 @@
   const $ = id => document.getElementById(id);
   const Q = new URLSearchParams(location.search);
   const MAP = 'fr', ITER = 310000, LS = 'frLobbyAdmin', LS_SCHOOL = 'frLobbyAdminSchool';
-  const S = { api: '', token: '', me: null, cfg: null, content: { schools: {}, rooms: {} }, school: '', photos: [], links: [], dirty: false, busy: false, editing: null };
+  const S = { api: '', token: '', me: null, cfg: null, content: { schools: {}, rooms: {} }, school: '', photos: [], links: [], quiz: [], dirty: false, busy: false, editing: null };
   const enc = new TextEncoder();
 
   // ── 작은 도구 ──
@@ -47,6 +47,8 @@
     video: '유튜브 영상 주소만 넣을 수 있어요.',
     web: '홈페이지 주소는 https:// 로 시작해야 해요.',
     links: '링크 주소는 https:// 로 시작해야 해요.',
+    bbs: '게시판 주소는 https:// 로 시작해야 해요.',
+    quiz: '퀴즈를 확인해 주세요. 문제마다 보기 2개 이상과 정답이 있어야 해요.',
     big: '사진이 너무 커요.',
     type: '사진 파일(JPG·PNG·WebP)만 올릴 수 있어요.',
     decode: '이 사진은 열 수 없어요. 다른 사진으로 해 주세요.',
@@ -253,9 +255,14 @@
     S.photos = Array.isArray(da.photos) ? da.photos.map(p => ({ id: p.id, cap: p.cap || '' })) : [];
     $('fTvTitle').value = pick(dt.title, tv.title);
     $('fTvUrl').value = pick(dt.video, tv.video);
+    $('fBbsUrl').value = pick((d.bbs || {}).url, (it.bbs || {}).url);
     S.links = Array.isArray(d.links) ? d.links.map(l => ({ label: l.label || '', url: l.url || '' })) : [];
+    // 저장한 퀴즈가 없으면 기본 퀴즈 3문제를 미리 채워 고칠 수 있게 한다(그대로 저장하면 기본 퀴즈로 남는다)
+    const toEdit = x => ({ q: x.q || '', choices: [0, 1, 2, 3].map(j => (x.choices || [])[j] || ''), answer: Number.isInteger(x.answer) ? x.answer : -1, note: x.note || '' });
+    S.quiz = ((Array.isArray(d.quiz) && d.quiz.length) ? d.quiz : defQuiz()).map(toEdit);
     renderPhotos();
     renderLinks();
+    renderQuiz();
     checkTv();
   }
   // 기본 글과 같으면 빈 값(= 기본 글 그대로)으로 저장한다
@@ -272,8 +279,33 @@
       book: { title: keep($('fBookTitle').value, bk.title), sub: keep($('fBookSub').value, bk.sub), text: keep($('fBookText').value, bk.text) },
       album: { title: keep($('fAlbumTitle').value, al.title), photos: S.photos.map(p => ({ id: p.id, cap: String(p.cap || '').trim() })) },
       tv: { title: keep($('fTvTitle').value, tv.title), video: keep($('fTvUrl').value, tv.video) },
-      links: S.links.map(l => ({ label: String(l.label || '').trim(), url: fixUrl(l.url) })).filter(l => l.url)
+      bbs: { url: keep(fixUrl($('fBbsUrl').value), (it.bbs || {}).url) },
+      links: S.links.map(l => ({ label: String(l.label || '').trim(), url: fixUrl(l.url) })).filter(l => l.url),
+      quiz: (q => (JSON.stringify(q) === JSON.stringify(defQuiz()) ? [] : q))(buildQuiz().filter(x => x.q))
     };
+  }
+  function defQuiz() {
+    return (S.cfg.defaultQuiz ? S.cfg.defaultQuiz(schoolCfg(S.school), S.cfg.schools) : [])
+      .map(x => ({ q: x.q, choices: x.choices.slice(), answer: x.answer, note: x.note || '' }));
+  }
+  // 편집 칸(보기 4칸, 정답 = 칸 번호) → 저장 꼴(빈 보기는 빼고, 정답 번호도 그만큼 당긴다)
+  function buildQuiz() {
+    return S.quiz.map(x => {
+      const choices = []; let answer = -1;
+      x.choices.forEach((c, j) => { c = String(c || '').trim(); if (!c) return; if (j === x.answer) answer = choices.length; choices.push(c); });
+      return { q: String(x.q || '').trim(), choices, answer, note: String(x.note || '').trim() };
+    });
+  }
+  function quizProblem() {
+    const list = buildQuiz();
+    for (let i = 0; i < list.length; i++) {
+      const x = list[i];
+      if (!x.q && !x.choices.length && !x.note) continue;
+      if (!x.q) return `문제 ${i + 1}: 문제 글을 써 주세요.`;
+      if (x.choices.length < 2) return `문제 ${i + 1}: 보기를 두 개 이상 써 주세요.`;
+      if (x.answer < 0) return `문제 ${i + 1}: 정답 보기 앞의 동그라미를 눌러 주세요.`;
+    }
+    return '';
   }
   function setDirty(v) {
     S.dirty = !!v;
@@ -292,8 +324,13 @@
     if (rc) {
       const v = $('fTvUrl').value.trim();
       if (v && !ytId(v)) { toast(ERR.video, true); $('fTvUrl').focus(); return false; }
+      const bbs = fixUrl($('fBbsUrl').value);
+      $('fBbsUrl').value = bbs;
+      if (bbs && !isUrl(bbs)) { toast(ERR.bbs, true); $('fBbsUrl').focus(); return false; }
       const badLink = S.links.find(l => l.url.trim() && !isUrl(fixUrl(l.url)));
       if (badLink) { toast(ERR.links, true); return false; }
+      const qp = quizProblem();
+      if (qp) { toast(qp, true); return false; }
     }
     busy('btnSave', true, '저장 중…');
     try {
@@ -433,6 +470,42 @@
     });
     $('addLink').hidden = S.links.length >= 8;
   }
+  // 교장 선생님 퀴즈(2026-10-24): 문제 5개까지, 보기 4칸(2칸 이상), 정답은 보기 앞 동그라미
+  function renderQuiz() {
+    const box = $('quiz');
+    box.textContent = '';
+    S.quiz.forEach((x, i) => {
+      const wrap = document.createElement('div'); wrap.className = 'qz';
+      const head = document.createElement('div'); head.className = 'qh';
+      const t = document.createElement('b'); t.textContent = `문제 ${i + 1}`;
+      head.append(t, mkBtn('빼기', () => { S.quiz.splice(i, 1); renderQuiz(); setDirty(true); }, 'danger x'));
+      const q = document.createElement('input'); q.placeholder = '문제(예: 우리 학교는 무슨 요일에 수업할까요?)'; q.maxLength = 120; q.value = x.q;
+      q.addEventListener('input', () => { x.q = q.value; });
+      wrap.append(head, q);
+      const rows = [];
+      for (let j = 0; j < 4; j++) {
+        const row = document.createElement('div'); row.className = 'qc' + (x.answer === j ? ' ok' : '');
+        const r = document.createElement('input'); r.type = 'radio'; r.name = 'qa' + i; r.checked = x.answer === j; r.title = '정답';
+        r.setAttribute('aria-label', `${j + 1}번 보기를 정답으로`);
+        r.addEventListener('change', () => { x.answer = j; rows.forEach((el, k) => el.classList.toggle('ok', k === j)); });
+        const c = document.createElement('input'); c.placeholder = `보기 ${j + 1}` + (j >= 2 ? ' (없어도 돼요)' : ''); c.maxLength = 40; c.value = x.choices[j];
+        c.addEventListener('input', () => { x.choices[j] = c.value; });
+        row.append(r, c); rows.push(row); wrap.appendChild(row);
+      }
+      const n = document.createElement('input'); n.placeholder = '맞히면 보여 줄 한마디 (없어도 돼요)'; n.maxLength = 120; n.value = x.note;
+      n.addEventListener('input', () => { x.note = n.value; });
+      wrap.appendChild(n);
+      box.appendChild(wrap);
+    });
+    $('addQuiz').hidden = S.quiz.length >= 5;
+  }
+  $('addQuiz').addEventListener('click', () => {
+    S.quiz.push({ q: '', choices: ['', '', '', ''], answer: -1, note: '' });
+    renderQuiz();
+    setDirty(true);
+    const ws = $('quiz').querySelectorAll('.qz');
+    ws[ws.length - 1].querySelector('input').focus();
+  });
   $('addLink').addEventListener('click', () => {
     S.links.push({ label: '', url: '' });
     renderLinks();
@@ -507,6 +580,30 @@
     try { await api('DELETE', '/api/admin/users?user=' + encodeURIComponent(u.user)); toast('계정을 지웠어요.'); if (S.editing === u.user) resetUserForm(); await loadUsers(); }
     catch (er) { toast(errText(er), true); }
   }
+  // 학교 담당 계정 한꺼번에 만들기(2026-10-24): 학교마다 아이디 = 학교 id(paris …), 역할 editor, 그 학교만. 이미 있는 아이디는 건드리지 않는다(비밀번호가 바뀌면 안 되므로)
+  $('bulkGo').addEventListener('click', async () => {
+    if (S.busy) return;
+    setErr('bulkErr', ''); setErr('bulkMsg', '');
+    const pw = $('bulkPw').value;
+    if (pw.length < 8) { setErr('bulkErr', '비밀번호는 8자 이상으로 해 주세요.'); return; }
+    let have;
+    try { have = new Set((await api('GET', '/api/admin/users')).users.map(u => u.user)); } catch (er) { setErr('bulkErr', errText(er)); return; }
+    const todo = (S.cfg.schools || []).filter(s => !have.has(normUser(s.id)));
+    if (!todo.length) { setErr('bulkMsg', '모든 학교에 계정이 이미 있어요.'); return; }
+    if (!confirm(`학교 ${todo.length}곳의 계정을 만들까요?\n${todo.map(s => s.id).join(', ')}`)) return;
+    busy('bulkGo', true, '만드는 중…');
+    const made = [], failed = [];
+    for (const s of todo) {
+      const user = normUser(s.id);
+      try { await api('POST', '/api/admin/users', { user, role: 'editor', schools: [s.id], key: await deriveKey(user, pw) }); made.push(user); }
+      catch (er) { failed.push(`${user}(${errText(er)})`); }
+    }
+    busy('bulkGo', false);
+    $('bulkPw').value = '';
+    setErr('bulkMsg', `만든 계정 ${made.length}개: ${made.join(', ') || '없음'}` + (failed.length ? ` / 못 만든 것: ${failed.join(', ')}` : ''));
+    toast(made.length ? `계정 ${made.length}개를 만들었어요. 각 학교에 아이디와 첫 비밀번호를 알려 주세요.` : '만든 계정이 없어요.', !made.length);
+    await loadUsers();
+  });
   $('uReset').addEventListener('click', resetUserForm);
   $('userForm').addEventListener('submit', async e => {
     e.preventDefault();

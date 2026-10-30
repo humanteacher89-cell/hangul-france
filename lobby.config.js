@@ -1,6 +1,6 @@
 // 프랑스 한글학교 로비 설정 v0.2. 화면 글·학교·지역 색·학교 공간(교실) 내용은 여기서만 고친다.
 // [확인 전] = 휴먼쌤 확인 전 문구. [예시] = 휴먼쌤이 줄 글·사진·영상으로 바꿀 자리.
-// 학교 목록: 하위 에이전트 웹 조사(2026-10-05, 자료\한글학교-목록.md → 10-06 실존 확인 자료\한글학교-실존확인-20261006.md, 20곳·소재지 좌표). 10-06 휴먼쌤 결정으로 숄레·디종·리옹 한글학교 3곳을 지도에서도 빼 로비 학교 목록 정본은 17곳.
+// 학교 목록: 하위 에이전트 웹 조사(2026-10-05, 자료\한글학교-목록.md → 10-06 실존 확인 자료\한글학교-실존확인-20261006.md, 20곳·소재지 좌표). 10-06 휴먼쌤 결정으로 숄레·디종·리옹 한글학교 3곳을 지도에서도 빼 17곳, 10-24 리옹 에콜리움도 빼 로비 학교 목록 정본은 16곳.
 window.LOBBY_CONFIG = {
   version: 'v0.2',
   text: {
@@ -11,7 +11,7 @@ window.LOBBY_CONFIG = {
     flag: '한',
     hintTouch: '조이스틱이나 땅을 눌러 걸어요',
     hintMouse: 'W A S D 키나 땅을 눌러 걸어요',
-    hintRoom: '교장 선생님이나 책·사진첩·TV 가까이 가 보세요',
+    hintRoom: '교장 선생님이나 책·사진첩·TV·게시판 가까이 가 보세요',
     map: '전체 지도',
     mapClose: '내 위치로',
     list: '학교 목록',
@@ -69,13 +69,34 @@ window.LOBBY_CONFIG = {
     doneBody: '{title} 연습을 마쳤어요. 다른 학교에서도 만나요.',   // [확인 전]
     again: '다시 하기',
     progress: '{i} / {n}',
+    // 교장 선생님 퀴즈(2026-10-24 휴먼쌤 "교장이 학교 퀴즈를 내는 방식으로 … 단순 퀴즈 답하는거정도로"). 학교가 관리자 페이지에서 넣고, 없으면 아래 기본 퀴즈
+    quizSub: '우리 학교 퀴즈를 내 줘요',
+    quizStart: '퀴즈 풀기',
+    quizAsk: '정답을 골라 보세요',
+    quizRight: '정답이에요!',
+    quizWrong: '아쉬워요. 다시 골라 볼까요?',
+    quizResult: '결과 보기',
+    quizDone: '퀴즈 끝!',
+    quizDoneAll: '{n}문제를 모두 한 번에 맞혔어요! 다른 학교 교장 선생님 퀴즈도 풀어 보세요.',
+    quizDoneBody: '{n}문제 가운데 {k}문제를 한 번에 맞혔어요. 다른 학교 교장 선생님 퀴즈도 풀어 보세요.',
+    quizCityQ: '{school}는 어느 도시에 있을까요?',
+    quizCityNote: '{city}에 있는 학교예요.',
+    quizBase: [
+      { q: '한글을 만든 사람은 누구일까요?', choices: ['이순신', '세종대왕', '광개토대왕'], answer: 1, note: '세종대왕이 1443년에 훈민정음(한글)을 만들었어요.' },
+      { q: '한글날은 언제일까요?', choices: ['3월 1일', '8월 15일', '10월 9일'], answer: 2, note: '10월 9일은 한글을 기리는 날이에요.' }
+    ],
     sampleTag: '예시',
     photoSoon: '한글학교 사진은 나중에 넣어요',
     videoSoon: '소개 영상은 나중에 넣어요',
     principal: '교장 선생님',
     bookSign: '책',
     albumSign: '사진첩',
-    tvSign: 'TV'
+    tvSign: 'TV',
+    // 게시판(2026-10-23 휴먼쌤 "좌측 하단에 게시판, 누르면 링크로 이동"). 주소는 관리자 페이지에서 학교마다 넣는다
+    bbsSign: '게시판',
+    bbsBtn: '게시판 열기',
+    bbsSub: '누르면 새 창에서 열려요',
+    bbsNone: '아직 게시판 주소가 없어요'
   },
   look: { sky: '#CDEBF6', sea: '#8DD3EA', base: '#EDE3CC', neighbor: '#DDE5D3', neighborLine: '#B9C4AC' },
   // 지역 코드(INSEE)별 한글·프랑스어 이름과 색. label: 땅에 쓴 이름의 크기(size, 칸)와 자리 옮김(dx 동쪽+, dz 남쪽+)
@@ -114,16 +135,28 @@ window.LOBBY_CONFIG = {
     shirt: ['#E0483E', '#2A4D9B', '#F2B544', '#3FA37A', '#8C6CD0', '#FFFFFF', '#F28DB2', '#4FB3D9'],
     pants: ['#2F3A56', '#4A5A78', '#6B5B4B', '#3D6B5A', '#7A4E3A']
   },
+  // 교장 선생님 기본 퀴즈(2026-10-24): 학교가 퀴즈를 저장하지 않았을 때 교실에서 내고, 관리자 페이지에도 이 3문제가 미리 들어간다.
+  // 1번 = 그 학교 도시(보기는 다른 학교 도시 2곳, 학교마다 다르지만 늘 같게), 2·3번 = text.quizBase. room.js와 admin.js가 함께 쓴다
+  defaultQuiz(s, schools) {
+    const T = this.text, out = [];
+    const others = [...new Set((schools || []).map(x => x.city).filter(c => c && c !== s.city))];
+    if (s.city && others.length >= 2) {
+      let h = 0; for (const ch of s.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      const n = others.length, choices = [others[h % n], others[(h + 1 + (h >> 3) % (n - 1)) % n]], at = h % 3;
+      choices.splice(at, 0, s.city);
+      out.push({ q: T.quizCityQ.replace('{school}', s.name), choices, answer: at, note: T.quizCityNote.replace('{city}', s.city) });
+    }
+    return out.concat((T.quizBase || []).map(x => ({ q: x.q, choices: x.choices.slice(), answer: x.answer, note: x.note || '' })));
+  },
   // 멀티플레이: 같은 폴더 relay.json의 중계 서버 주소를 읽는다(없으면 혼자 보기). 주소 ?mp=0 끔, ?mp=ws://…/ws 시험 서버
   multiplayer: { file: 'relay.json', lobbyRoom: 'fr:lobby', roomPrefix: 'fr:', sendHz: 4 },   // sendHz: 움직일 때 초당 보내는 횟수(Cloudflare 무료 한도 때문에 낮게. 60명 예정이라 10-06 6 → 4)
-  // 한글학교 17곳(휴먼쌤 2026-10-06 결정: 조사한 20곳에서 숄레·디종·리옹 한글학교 3곳을 지도에서도 뺌. 리옹 에콜리움은 남김). 실존 확인 2026-10-06(하위 에이전트, 자료\한글학교-실존확인-20261006.md): 주프랑스 대사관 연락처 표(원문)·한국교육원 지도·
+  // 한글학교 16곳(휴먼쌤 2026-10-06 결정: 조사한 20곳에서 숄레·디종·리옹 한글학교 3곳을 지도에서도 뺌. 10-24 리옹 에콜리움도 뺌). 실존 확인 2026-10-06(하위 에이전트, 자료\한글학교-실존확인-20261006.md): 주프랑스 대사관 연락처 표(원문)·한국교육원 지도·
   // 스터디코리안 한글학교 정보(2026-01)에 모두 있는 곳 = 등급 ◎. 좌표는 학교 소재지(번지 수준). 연구부 '검증' 딱지는 아직 아님.
   // pending: true = 아직 확인 중(지금은 없음. 뺀 숄레가 그랬다). rooms에 같은 id가 있으면 입장할 때 그 교실로 들어간다
   schools: [
     { id: 'paris', name: '파리 한글학교', nameFr: 'École coréenne de Paris', city: '파리', lon: 2.3627, lat: 48.8250, web: 'https://www.helloasso.com/associations/ecole-coreenne-de-paris' },
     { id: 'opera', name: '오페라 한글학교', nameFr: "École coréenne de l'Opéra de Paris", city: '파리', lon: 2.3362, lat: 48.8743, web: 'https://www.instagram.com/hangeul75009/' },
     { id: 'arissol', name: '파리 아리솔 한글학교', nameFr: 'École coréenne Arissol', city: '파리', lon: 2.3302, lat: 48.8553, web: 'https://fr.arissol-association.com/' },
-    { id: 'lium', name: '리옹 에콜리움 한글학교', nameFr: 'Lium École coréenne', city: '리옹', lon: 4.8323, lat: 45.7547, web: 'https://www.ecolelium.com/' },
     { id: 'grenoble', name: '그르노블 한글학교', nameFr: 'Association franco-coréenne de Grenoble et de l\'Isère', city: '그르노블', lon: 5.8229, lat: 45.1913, web: 'https://afcgi.wordpress.com/' },
     { id: 'strasbourg', name: '스트라스부르 한글학교', nameFr: 'École coréenne de Strasbourg', city: '스트라스부르', lon: 7.7779, lat: 48.5821, web: 'https://ecolecoreenne.blogspot.com/' },
     { id: 'toulouse', name: '툴루즈 한글학교', nameFr: 'École coréenne de Toulouse', city: '툴루즈', lon: 1.3916, lat: 43.5853, web: '' },
@@ -152,18 +185,18 @@ window.LOBBY_CONFIG = {
         poster: { title: '클레르몽페랑', sub: 'Clermont-Ferrand · Auvergne', kind: 'cathedral', color: '#2B2B2F', foot: 'Auvergne · France' }
       },
       boardTitle: '클레르몽페랑 한글학교',
-      boardLine: '오늘의 회화 · 쇼핑하기',                          // [확인 전]
+      boardLine: '',   // 칠판 한 줄: 학교가 관리자 페이지에서 넣는다(10-24 휴먼쌤 "칠판에 '오늘의 회화'는 삭제")
       welcome: '클레르몽페랑 한글학교 교실이에요. 교장 선생님께 다가가 보세요.',   // [확인 전]
       principal: {
         name: '교장 선생님',                                          // [확인 전] 실제 호칭·이름은 휴먼쌤이 정함
         look: { skin: '#F6CFAE', hair: '#4A3428', hairStyle: 1, shirt: '#3E6B8F', pants: '#2F3A56' },
         lines: [                                                     // [확인 전] 말 걸면 차례로 나오는 인사
           '안녕하세요! 클레르몽페랑 한글학교에 온 것을 환영해요.',
-          '저는 이 학교 교장 선생님이에요. 클레르몽페랑에서는 저와 같이 \'쇼핑하기\'를 연습해 볼 거예요.',
-          '제가 가게 점원이 될게요. 알맞은 말을 골라 보세요.'
+          '저는 이 학교 교장 선생님이에요. 우리 학교 퀴즈를 내 볼게요. 맞혀 보세요!'
         ]
       },
       items: {
+        bbs: { url: 'https://padlet.com/humanteacher89/padlet-s024s1j4y7p2v3kic1bo' },   // 10-24 휴먼쌤 "모든 교실의 게시판은 우선 이 링크". 학교가 관리자 페이지에서 바꾸면 그 주소
         book: {
           title: '클레르몽페랑',
           sub: 'Clermont-Ferrand · 오베르뉴론알프',
@@ -230,18 +263,18 @@ window.LOBBY_CONFIG = {
         poster: { title: '파리', sub: 'Paris · Île-de-France', kind: 'eiffel', color: '#4A5C7A', foot: 'Île-de-France · France' }
       },
       boardTitle: '파리 한글학교',
-      boardLine: '오늘의 회화 · 인사·자기소개',                      // [확인 전]
+      boardLine: '',   // 칠판 한 줄: 학교가 관리자 페이지에서 넣는다(10-24 휴먼쌤 "칠판에 '오늘의 회화'는 삭제")
       welcome: '파리 한글학교 교실이에요. 교장 선생님께 다가가 보세요.',   // [확인 전]
       principal: {
         name: '교장 선생님',                                          // [확인 전]
         look: { skin: '#F6CFAE', hair: '#2B2420', hairStyle: 0, shirt: '#B85C6B', pants: '#3A3F5C' },
         lines: [
           '안녕하세요! 파리 한글학교에 온 것을 환영해요.',
-          '저는 이 학교 교장 선생님이에요. 파리에서는 저와 같이 \'인사·자기소개\'를 연습해 볼 거예요.',
-          '제가 새 친구가 될게요. 알맞은 말을 골라 보세요.'
+          '저는 이 학교 교장 선생님이에요. 우리 학교 퀴즈를 내 볼게요. 맞혀 보세요!'
         ]
       },
       items: {
+        bbs: { url: 'https://padlet.com/humanteacher89/padlet-s024s1j4y7p2v3kic1bo' },   // 10-24 휴먼쌤 "모든 교실의 게시판은 우선 이 링크". 학교가 관리자 페이지에서 바꾸면 그 주소
         book: {
           title: '파리',
           sub: 'Paris · 일드프랑스',
@@ -306,18 +339,18 @@ window.LOBBY_CONFIG = {
         poster: { title: '파리', sub: 'Paris · Île-de-France', kind: 'opera', color: '#B8860B', foot: 'Île-de-France · France' }
       },
       boardTitle: '오페라 한글학교',
-      boardLine: '오늘의 회화 · 친구와 약속 정하기',                  // [확인 전]
+      boardLine: '',   // 칠판 한 줄: 학교가 관리자 페이지에서 넣는다(10-24 휴먼쌤 "칠판에 '오늘의 회화'는 삭제")
       welcome: '오페라 한글학교 교실이에요. 교장 선생님께 다가가 보세요.',   // [확인 전]
       principal: {
         name: '교장 선생님',                                          // [확인 전]
         look: { skin: '#FFE0C7', hair: '#6E7FA8', hairStyle: 2, shirt: '#7B5EA7', pants: '#2E2E3E' },
         lines: [
           '안녕하세요! 오페라 한글학교에 온 것을 환영해요.',
-          '저는 이 학교 교장 선생님이에요. 파리에서는 저와 같이 \'친구와 약속 정하기\'를 연습해 볼 거예요.',
-          '제가 친구가 될게요. 알맞은 말을 골라 보세요.'
+          '저는 이 학교 교장 선생님이에요. 우리 학교 퀴즈를 내 볼게요. 맞혀 보세요!'
         ]
       },
       items: {
+        bbs: { url: 'https://padlet.com/humanteacher89/padlet-s024s1j4y7p2v3kic1bo' },   // 10-24 휴먼쌤 "모든 교실의 게시판은 우선 이 링크". 학교가 관리자 페이지에서 바꾸면 그 주소
         book: {
           title: '파리',
           sub: 'Paris · 일드프랑스',
@@ -382,18 +415,18 @@ window.LOBBY_CONFIG = {
         poster: { title: '파리', sub: 'Paris · Île-de-France', kind: 'bridge', color: '#5A7A6A', foot: 'Île-de-France · France' }
       },
       boardTitle: '파리 아리솔 한글학교',
-      boardLine: '오늘의 회화 · 가족 소개',                          // [확인 전]
+      boardLine: '',   // 칠판 한 줄: 학교가 관리자 페이지에서 넣는다(10-24 휴먼쌤 "칠판에 '오늘의 회화'는 삭제")
       welcome: '파리 아리솔 한글학교 교실이에요. 교장 선생님께 다가가 보세요.',   // [확인 전]
       principal: {
         name: '교장 선생님',                                          // [확인 전]
         look: { skin: '#E8B48F', hair: '#7A4E33', hairStyle: 1, shirt: '#4F9A8A', pants: '#4A4A5A' },
         lines: [
           '안녕하세요! 파리 아리솔 한글학교에 온 것을 환영해요.',
-          '저는 이 학교 교장 선생님이에요. 파리에서는 저와 같이 \'가족 소개\'를 연습해 볼 거예요.',
-          '제가 친구가 될게요. 알맞은 말을 골라 보세요.'
+          '저는 이 학교 교장 선생님이에요. 우리 학교 퀴즈를 내 볼게요. 맞혀 보세요!'
         ]
       },
       items: {
+        bbs: { url: 'https://padlet.com/humanteacher89/padlet-s024s1j4y7p2v3kic1bo' },   // 10-24 휴먼쌤 "모든 교실의 게시판은 우선 이 링크". 학교가 관리자 페이지에서 바꾸면 그 주소
         book: {
           title: '파리',
           sub: 'Paris · 일드프랑스',
@@ -450,82 +483,6 @@ window.LOBBY_CONFIG = {
         }
       ]
     },
-    lium: {
-      theme: {
-        wall: '#FFF4E0', wainscot: '#E6C99B', floor: ['#DDB27F', '#D2A672', '#E7C092'], rug: '#E8A598', board: '#6B3E2E',
-        sky: '#FBE6CF',
-        view: { kind: 'river', sky: ['#F7C99B', '#FDF1E0'], far: '#E3B9A0', near: '#C98F78', water: '#8FB9D6', accent: '#E8836B' },
-        poster: { title: '리옹', sub: 'Lyon · Auvergne-Rhône-Alpes', kind: 'basilica', color: '#C97B5A', foot: 'Auvergne-Rhône-Alpes · France' }
-      },
-      boardTitle: '리옹 에콜리움 한글학교',
-      boardLine: '오늘의 회화 · 음식 주문하기',                      // [확인 전]
-      welcome: '리옹 에콜리움 한글학교 교실이에요. 교장 선생님께 다가가 보세요.',   // [확인 전]
-      principal: {
-        name: '교장 선생님',                                          // [확인 전]
-        look: { skin: '#C98E66', hair: '#2B2420', hairStyle: 2, shirt: '#D9822B', pants: '#3B3B4F' },
-        lines: [
-          '안녕하세요! 리옹 에콜리움 한글학교에 온 것을 환영해요.',
-          '저는 이 학교 교장 선생님이에요. 리옹에서는 저와 같이 \'음식 주문하기\'를 연습해 볼 거예요.',
-          '제가 식당 직원이 될게요. 알맞은 말을 골라 보세요.'
-        ]
-      },
-      items: {
-        book: {
-          title: '리옹',
-          sub: 'Lyon · 오베르뉴론알프',
-          text: '리옹은 프랑스 남동쪽에 있는 큰 도시예요. 도시 안으로 론강과 손강, 두 강이 흘러요.\n\n언덕 위에는 하얀 성당이 서 있고, 맛있는 음식으로도 이름난 도시예요.\n\n(이 글은 보기 글이에요. 휴먼쌤이 주시는 소개 글로 바뀝니다.)',
-          sample: true
-        },
-        album: {
-          title: '리옹 에콜리움 한글학교 사진첩',
-          photos: [],
-          captions: ['수업 시간', '한글날 행사', '운동회', '졸업식']
-        },
-        tv: {
-          title: '리옹 소개 영상',
-          video: '',
-          sample: true
-        }
-      },
-      // 한국어 회화 상황 [예시, 확인 전]
-      situations: [
-        {
-          id: 'order', title: '음식 주문하기', npcRole: '식당 직원',
-          steps: [
-            { npc: '어서 오세요! 몇 분이세요?',
-              choices: [
-                { ko: '두 명이에요.', ok: true },
-                { ko: '안녕히 계세요.', hint: '들어오자마자 하는 인사가 아니에요. 사람 수를 말해요.' },
-                { ko: '저는 열 살이에요.', hint: '몇 명인지 물었어요.' }
-              ] },
-            { npc: '여기 메뉴예요. 무엇을 드릴까요?',
-              choices: [
-                { ko: '내일 봐요.', hint: '헤어질 때 하는 말이에요. 먹고 싶은 것을 말해요.' },
-                { ko: '피자 하나 주세요.', ok: true },
-                { ko: '제 이름은 민준이에요.', hint: '이름을 묻지 않았어요. 주문을 해요.' }
-              ] },
-            { npc: '마실 것은 무엇으로 드릴까요?',
-              choices: [
-                { ko: '물 주세요.', ok: true },
-                { ko: '토요일에 만나요.', hint: '약속 이야기가 아니에요. 마실 것을 골라요.' },
-                { ko: '파리에 살아요.', hint: '사는 곳을 묻지 않았어요.' }
-              ] },
-            { npc: '음식 나왔어요. 맛있게 드세요!',
-              choices: [
-                { ko: '처음 뵙겠습니다.', hint: '처음 만날 때 하는 인사예요.' },
-                { ko: '어디에 살아요?', hint: '음식을 받았을 때 하는 말이 아니에요.' },
-                { ko: '고맙습니다. 잘 먹겠습니다!', ok: true }
-              ] },
-            { npc: '맛있게 드셨어요? 안녕히 가세요!',
-              choices: [
-                { ko: '네, 맛있었어요. 안녕히 계세요!', ok: true, note: '식당에 남는 사람에게는 \'안녕히 계세요\'라고 해요.' },
-                { ko: '어서 오세요!', hint: '손님을 맞을 때 직원이 하는 말이에요.' },
-                { ko: '피자 하나 주세요.', hint: '이미 다 먹었어요. 인사로 끝내요.' }
-              ] }
-          ]
-        }
-      ]
-    },
     grenoble: {
       theme: {
         wall: '#EEF6FA', wainscot: '#B9CFDB', floor: ['#D8C09A', '#CFB68D', '#E2CCA8'], rug: '#9CC3DD', board: '#2D4F66',
@@ -534,18 +491,18 @@ window.LOBBY_CONFIG = {
         poster: { title: '그르노블', sub: 'Grenoble · Auvergne-Rhône-Alpes', kind: 'cablecar', color: '#D9534F', foot: 'Auvergne-Rhône-Alpes · France' }
       },
       boardTitle: '그르노블 한글학교',
-      boardLine: '오늘의 회화 · 날씨와 계절',                          // [확인 전]
+      boardLine: '',   // 칠판 한 줄: 학교가 관리자 페이지에서 넣는다(10-24 휴먼쌤 "칠판에 '오늘의 회화'는 삭제")
       welcome: '그르노블 한글학교 교실이에요. 교장 선생님께 다가가 보세요.',   // [확인 전]
       principal: {
         name: '교장 선생님',                                          // [확인 전]
         look: { skin: '#FFE0C7', hair: '#6E7FA8', hairStyle: 2, shirt: '#4F8FB5', pants: '#3B4A63' },
         lines: [                                                     // [확인 전]
           '안녕하세요! 그르노블 한글학교에 온 것을 환영해요.',
-          '저는 이 학교 교장 선생님이에요. 그르노블에서는 저와 같이 \'날씨와 계절\'을 연습해 볼 거예요.',
-          '제가 이웃집 친구가 될게요. 알맞은 말을 골라 보세요.'
+          '저는 이 학교 교장 선생님이에요. 우리 학교 퀴즈를 내 볼게요. 맞혀 보세요!'
         ]
       },
       items: {
+        bbs: { url: 'https://padlet.com/humanteacher89/padlet-s024s1j4y7p2v3kic1bo' },   // 10-24 휴먼쌤 "모든 교실의 게시판은 우선 이 링크". 학교가 관리자 페이지에서 바꾸면 그 주소
         book: {
           title: '그르노블',
           sub: 'Grenoble · 오베르뉴론알프',
@@ -610,18 +567,18 @@ window.LOBBY_CONFIG = {
         poster: { title: '스트라스부르', sub: 'Strasbourg · Grand Est', kind: 'house', color: '#C9704F', foot: 'Grand Est · France' }
       },
       boardTitle: '스트라스부르 한글학교',
-      boardLine: '오늘의 회화 · 명절(설날·추석)',                      // [확인 전]
+      boardLine: '',   // 칠판 한 줄: 학교가 관리자 페이지에서 넣는다(10-24 휴먼쌤 "칠판에 '오늘의 회화'는 삭제")
       welcome: '스트라스부르 한글학교 교실이에요. 교장 선생님께 다가가 보세요.',   // [확인 전]
       principal: {
         name: '교장 선생님',                                          // [확인 전]
         look: { skin: '#E8B48F', hair: '#2B2420', hairStyle: 0, shirt: '#B5563E', pants: '#3D3A4F' },
         lines: [                                                     // [확인 전]
           '안녕하세요! 스트라스부르 한글학교에 온 것을 환영해요.',
-          '저는 이 학교 교장 선생님이에요. 스트라스부르에서는 저와 같이 \'명절(설날·추석)\'을 연습해 볼 거예요.',
-          '제가 할머니가 될게요. 알맞은 말을 골라 보세요.'
+          '저는 이 학교 교장 선생님이에요. 우리 학교 퀴즈를 내 볼게요. 맞혀 보세요!'
         ]
       },
       items: {
+        bbs: { url: 'https://padlet.com/humanteacher89/padlet-s024s1j4y7p2v3kic1bo' },   // 10-24 휴먼쌤 "모든 교실의 게시판은 우선 이 링크". 학교가 관리자 페이지에서 바꾸면 그 주소
         book: {
           title: '스트라스부르',
           sub: 'Strasbourg · 그랑테스트',
@@ -686,18 +643,18 @@ window.LOBBY_CONFIG = {
         poster: { title: '툴루즈', sub: 'Toulouse · Occitanie', kind: 'plane', color: '#4F7FB8', foot: 'Occitanie · France' }
       },
       boardTitle: '툴루즈 한글학교',
-      boardLine: '오늘의 회화 · 버스와 지하철 타기',                  // [확인 전]
+      boardLine: '',   // 칠판 한 줄: 학교가 관리자 페이지에서 넣는다(10-24 휴먼쌤 "칠판에 '오늘의 회화'는 삭제")
       welcome: '툴루즈 한글학교 교실이에요. 교장 선생님께 다가가 보세요.',   // [확인 전]
       principal: {
         name: '교장 선생님',                                          // [확인 전]
         look: { skin: '#C98E66', hair: '#2B2420', hairStyle: 1, shirt: '#D07A5F', pants: '#35405C' },
         lines: [                                                     // [확인 전]
           '안녕하세요! 툴루즈 한글학교에 온 것을 환영해요.',
-          '저는 이 학교 교장 선생님이에요. 툴루즈에서는 저와 같이 \'교통 이용하기\'를 연습해 볼 거예요.',
-          '제가 지하철역 직원이 될게요. 알맞은 말을 골라 보세요.'
+          '저는 이 학교 교장 선생님이에요. 우리 학교 퀴즈를 내 볼게요. 맞혀 보세요!'
         ]
       },
       items: {
+        bbs: { url: 'https://padlet.com/humanteacher89/padlet-s024s1j4y7p2v3kic1bo' },   // 10-24 휴먼쌤 "모든 교실의 게시판은 우선 이 링크". 학교가 관리자 페이지에서 바꾸면 그 주소
         book: {
           title: '툴루즈',
           sub: 'Toulouse · 옥시타니',
@@ -762,18 +719,18 @@ window.LOBBY_CONFIG = {
         poster: { title: '엑상프로방스', sub: 'Aix-en-Provence · Provence-Alpes-Côte d\'Azur', kind: 'fountain', color: '#6FA8C9', foot: 'Provence-Alpes-Côte d\'Azur · France' }
       },
       boardTitle: '엑상프로방스 한글학교',
-      boardLine: '오늘의 회화 · 취미 말하기',                          // [확인 전]
+      boardLine: '',   // 칠판 한 줄: 학교가 관리자 페이지에서 넣는다(10-24 휴먼쌤 "칠판에 '오늘의 회화'는 삭제")
       welcome: '엑상프로방스 한글학교 교실이에요. 교장 선생님께 다가가 보세요.',   // [확인 전]
       principal: {
         name: '교장 선생님',                                          // [확인 전]
         look: { skin: '#F6CFAE', hair: '#E2C48F', hairStyle: 2, shirt: '#8E7CC3', pants: '#4A4F66' },
         lines: [                                                     // [확인 전]
           '안녕하세요! 엑상프로방스 한글학교에 온 것을 환영해요.',
-          '저는 이 학교 교장 선생님이에요. 엑상프로방스에서는 저와 같이 \'취미 말하기\'를 연습해 볼 거예요.',
-          '제가 새로 만난 친구가 될게요. 알맞은 말을 골라 보세요.'
+          '저는 이 학교 교장 선생님이에요. 우리 학교 퀴즈를 내 볼게요. 맞혀 보세요!'
         ]
       },
       items: {
+        bbs: { url: 'https://padlet.com/humanteacher89/padlet-s024s1j4y7p2v3kic1bo' },   // 10-24 휴먼쌤 "모든 교실의 게시판은 우선 이 링크". 학교가 관리자 페이지에서 바꾸면 그 주소
         book: {
           title: '엑상프로방스',
           sub: 'Aix-en-Provence · 프로방스알프코트다쥐르',
@@ -838,18 +795,18 @@ window.LOBBY_CONFIG = {
         poster: { title: '보르도', sub: 'Bordeaux · Nouvelle-Aquitaine', kind: 'grapes', color: '#7A3E78', foot: 'Nouvelle-Aquitaine · France' }
       },
       boardTitle: '보르도 한글학교',
-      boardLine: '오늘의 회화 · 길 묻기',                              // [확인 전]
+      boardLine: '',   // 칠판 한 줄: 학교가 관리자 페이지에서 넣는다(10-24 휴먼쌤 "칠판에 '오늘의 회화'는 삭제")
       welcome: '보르도 한글학교 교실이에요. 교장 선생님께 다가가 보세요.',   // [확인 전]
       principal: {
         name: '교장 선생님',                                          // [확인 전]
         look: { skin: '#E8B48F', hair: '#2B2420', hairStyle: 0, shirt: '#8E5A8A', pants: '#3A3F55' },
         lines: [                                                     // [확인 전]
           '안녕하세요! 보르도 한글학교에 온 것을 환영해요.',
-          '저는 이 학교 교장 선생님이에요. 보르도에서는 저와 같이 \'길 묻기\'를 연습해 볼 거예요.',
-          '제가 길에서 만난 아저씨가 될게요. 알맞은 말을 골라 보세요.'
+          '저는 이 학교 교장 선생님이에요. 우리 학교 퀴즈를 내 볼게요. 맞혀 보세요!'
         ]
       },
       items: {
+        bbs: { url: 'https://padlet.com/humanteacher89/padlet-s024s1j4y7p2v3kic1bo' },   // 10-24 휴먼쌤 "모든 교실의 게시판은 우선 이 링크". 학교가 관리자 페이지에서 바꾸면 그 주소
         book: {
           title: '보르도',
           sub: 'Bordeaux · 누벨아키텐',
@@ -914,18 +871,18 @@ window.LOBBY_CONFIG = {
         poster: { title: '몽펠리에', sub: 'Montpellier · Occitanie', kind: 'cathedral', color: '#C98E5E', foot: 'Occitanie · France' }
       },
       boardTitle: '몽펠리에 한글학교',
-      boardLine: '오늘의 회화 · 병원·약국',                            // [확인 전]
+      boardLine: '',   // 칠판 한 줄: 학교가 관리자 페이지에서 넣는다(10-24 휴먼쌤 "칠판에 '오늘의 회화'는 삭제")
       welcome: '몽펠리에 한글학교 교실이에요. 교장 선생님께 다가가 보세요.',   // [확인 전]
       principal: {
         name: '교장 선생님',                                          // [확인 전]
         look: { skin: '#FFE0C7', hair: '#6E7FA8', hairStyle: 2, shirt: '#4F9EA5', pants: '#4A4E63' },
         lines: [                                                     // [확인 전]
           '안녕하세요! 몽펠리에 한글학교에 온 것을 환영해요.',
-          '저는 이 학교 교장 선생님이에요. 몽펠리에에서는 저와 같이 \'병원·약국\'을 연습해 볼 거예요.',
-          '제가 의사 선생님이 될게요. 알맞은 말을 골라 보세요.'
+          '저는 이 학교 교장 선생님이에요. 우리 학교 퀴즈를 내 볼게요. 맞혀 보세요!'
         ]
       },
       items: {
+        bbs: { url: 'https://padlet.com/humanteacher89/padlet-s024s1j4y7p2v3kic1bo' },   // 10-24 휴먼쌤 "모든 교실의 게시판은 우선 이 링크". 학교가 관리자 페이지에서 바꾸면 그 주소
         book: {
           title: '몽펠리에',
           sub: 'Montpellier · 옥시타니',
@@ -990,18 +947,18 @@ window.LOBBY_CONFIG = {
         poster: { title: '낭트', sub: 'Nantes · Pays de la Loire', kind: 'elephant', color: '#8A6F5A', foot: 'Pays de la Loire · France' }
       },
       boardTitle: '낭트 한글학교',
-      boardLine: '오늘의 회화 · 학교생활',                            // [확인 전]
+      boardLine: '',   // 칠판 한 줄: 학교가 관리자 페이지에서 넣는다(10-24 휴먼쌤 "칠판에 '오늘의 회화'는 삭제")
       welcome: '낭트 한글학교 교실이에요. 교장 선생님께 다가가 보세요.',     // [확인 전]
       principal: {
         name: '교장 선생님',                                          // [확인 전]
         look: { skin: '#E8B48F', hair: '#B98A57', hairStyle: 1, shirt: '#6FA05F', pants: '#3B4A5C' },
         lines: [                                                     // [확인 전]
           '안녕하세요! 낭트 한글학교에 온 것을 환영해요.',
-          '저는 이 학교 교장 선생님이에요. 낭트에서는 저와 같이 \'학교생활\'을 연습해 볼 거예요.',
-          '제가 새로 만난 반 친구가 될게요. 알맞은 말을 골라 보세요.'
+          '저는 이 학교 교장 선생님이에요. 우리 학교 퀴즈를 내 볼게요. 맞혀 보세요!'
         ]
       },
       items: {
+        bbs: { url: 'https://padlet.com/humanteacher89/padlet-s024s1j4y7p2v3kic1bo' },   // 10-24 휴먼쌤 "모든 교실의 게시판은 우선 이 링크". 학교가 관리자 페이지에서 바꾸면 그 주소
         book: {
           title: '낭트',
           sub: 'Nantes · 페이드라루아르',
@@ -1066,18 +1023,18 @@ window.LOBBY_CONFIG = {
         poster: { title: '릴', sub: 'Lille · Hauts-de-France', kind: 'belfry', color: '#B5604C', foot: 'Hauts-de-France · France' }
       },
       boardTitle: '릴 한글학교',
-      boardLine: '오늘의 회화 · 생일·초대',                            // [확인 전]
+      boardLine: '',   // 칠판 한 줄: 학교가 관리자 페이지에서 넣는다(10-24 휴먼쌤 "칠판에 '오늘의 회화'는 삭제")
       welcome: '릴 한글학교 교실이에요. 교장 선생님께 다가가 보세요.',       // [확인 전]
       principal: {
         name: '교장 선생님',                                          // [확인 전]
         look: { skin: '#C98E66', hair: '#2B2420', hairStyle: 2, shirt: '#D9776F', pants: '#35415A' },
         lines: [                                                     // [확인 전]
           '안녕하세요! 릴 한글학교에 온 것을 환영해요.',
-          '저는 이 학교 교장 선생님이에요. 릴에서는 저와 같이 \'생일·초대\'를 연습해 볼 거예요.',
-          '제가 생일 파티에 초대하는 친구가 될게요. 알맞은 말을 골라 보세요.'
+          '저는 이 학교 교장 선생님이에요. 우리 학교 퀴즈를 내 볼게요. 맞혀 보세요!'
         ]
       },
       items: {
+        bbs: { url: 'https://padlet.com/humanteacher89/padlet-s024s1j4y7p2v3kic1bo' },   // 10-24 휴먼쌤 "모든 교실의 게시판은 우선 이 링크". 학교가 관리자 페이지에서 바꾸면 그 주소
         book: {
           title: '릴',
           sub: 'Lille · 오드프랑스',
@@ -1142,18 +1099,18 @@ window.LOBBY_CONFIG = {
         poster: { title: '투르', sub: 'Tours · Centre-Val de Loire', kind: 'castle', color: '#B9A98C', foot: 'Centre-Val de Loire · France' }
       },
       boardTitle: '투르 한글학교',
-      boardLine: '오늘의 회화 · 도서관에서 책 빌리기',                 // [확인 전]
+      boardLine: '',   // 칠판 한 줄: 학교가 관리자 페이지에서 넣는다(10-24 휴먼쌤 "칠판에 '오늘의 회화'는 삭제")
       welcome: '투르 한글학교 교실이에요. 교장 선생님께 다가가 보세요.',   // [확인 전]
       principal: {
         name: '교장 선생님',                                          // [확인 전]
         look: { skin: '#FFE0C7', hair: '#7A4E33', hairStyle: 2, shirt: '#8F6BA8', pants: '#3A3F5C' },
         lines: [
           '안녕하세요! 투르 한글학교에 온 것을 환영해요.',
-          '저는 이 학교 교장 선생님이에요. 투르에서는 저와 같이 \'도서관에서 책 빌리기\'를 연습해 볼 거예요.',
-          '제가 도서관 사서 선생님이 될게요. 알맞은 말을 골라 보세요.'
+          '저는 이 학교 교장 선생님이에요. 우리 학교 퀴즈를 내 볼게요. 맞혀 보세요!'
         ]
       },
       items: {
+        bbs: { url: 'https://padlet.com/humanteacher89/padlet-s024s1j4y7p2v3kic1bo' },   // 10-24 휴먼쌤 "모든 교실의 게시판은 우선 이 링크". 학교가 관리자 페이지에서 바꾸면 그 주소
         book: {
           title: '투르',
           sub: 'Tours · 상트르발드루아르',
@@ -1218,18 +1175,18 @@ window.LOBBY_CONFIG = {
         poster: { title: '브레스트', sub: 'Brest · Bretagne', kind: 'lighthouse', color: '#C94F4F', foot: 'Bretagne · France' }
       },
       boardTitle: '브레스트 한글학교',
-      boardLine: '오늘의 회화 · 전화하기',                              // [확인 전]
+      boardLine: '',   // 칠판 한 줄: 학교가 관리자 페이지에서 넣는다(10-24 휴먼쌤 "칠판에 '오늘의 회화'는 삭제")
       welcome: '브레스트 한글학교 교실이에요. 교장 선생님께 다가가 보세요.',   // [확인 전]
       principal: {
         name: '교장 선생님',                                          // [확인 전]
         look: { skin: '#E8B48F', hair: '#2B2420', hairStyle: 0, shirt: '#4F8F8B', pants: '#35405A' },
         lines: [
           '안녕하세요! 브레스트 한글학교에 온 것을 환영해요.',
-          '저는 이 학교 교장 선생님이에요. 브레스트에서는 저와 같이 \'전화하기\'를 연습해 볼 거예요.',
-          '제가 친구의 엄마가 될게요. 알맞은 말을 골라 보세요.'
+          '저는 이 학교 교장 선생님이에요. 우리 학교 퀴즈를 내 볼게요. 맞혀 보세요!'
         ]
       },
       items: {
+        bbs: { url: 'https://padlet.com/humanteacher89/padlet-s024s1j4y7p2v3kic1bo' },   // 10-24 휴먼쌤 "모든 교실의 게시판은 우선 이 링크". 학교가 관리자 페이지에서 바꾸면 그 주소
         book: {
           title: '브레스트',
           sub: 'Brest · 브르타뉴',
@@ -1294,18 +1251,18 @@ window.LOBBY_CONFIG = {
         poster: { title: '마르세유', sub: 'Marseille · Provence-Alpes-Côte d\'Azur', kind: 'basilica', color: '#D9C89E', foot: 'Provence-Alpes-Côte d\'Azur · France' }
       },
       boardTitle: '마르세유 한글학교',
-      boardLine: '오늘의 회화 · 고마움·사과 표현하기',                  // [확인 전]
+      boardLine: '',   // 칠판 한 줄: 학교가 관리자 페이지에서 넣는다(10-24 휴먼쌤 "칠판에 '오늘의 회화'는 삭제")
       welcome: '마르세유 한글학교 교실이에요. 교장 선생님께 다가가 보세요.',   // [확인 전]
       principal: {
         name: '교장 선생님',                                          // [확인 전]
         look: { skin: '#C98E66', hair: '#2B2420', hairStyle: 1, shirt: '#E08A5A', pants: '#33415C' },
         lines: [
           '안녕하세요! 마르세유 한글학교에 온 것을 환영해요.',
-          '저는 이 학교 교장 선생님이에요. 마르세유에서는 저와 같이 \'고마움과 사과 표현하기\'를 연습해 볼 거예요.',
-          '제가 같은 반 친구가 될게요. 알맞은 말을 골라 보세요.'
+          '저는 이 학교 교장 선생님이에요. 우리 학교 퀴즈를 내 볼게요. 맞혀 보세요!'
         ]
       },
       items: {
+        bbs: { url: 'https://padlet.com/humanteacher89/padlet-s024s1j4y7p2v3kic1bo' },   // 10-24 휴먼쌤 "모든 교실의 게시판은 우선 이 링크". 학교가 관리자 페이지에서 바꾸면 그 주소
         book: {
           title: '마르세유',
           sub: 'Marseille · 프로방스알프코트다쥐르',
@@ -1370,18 +1327,18 @@ window.LOBBY_CONFIG = {
         poster: { title: '르망', sub: 'Le Mans · Pays de la Loire', kind: 'car', color: '#C94F4F', foot: 'Pays de la Loire · France' }
       },
       boardTitle: '르망 한글학교',
-      boardLine: '오늘의 회화 · 시간 말하기',                           // [확인 전]
+      boardLine: '',   // 칠판 한 줄: 학교가 관리자 페이지에서 넣는다(10-24 휴먼쌤 "칠판에 '오늘의 회화'는 삭제")
       welcome: '르망 한글학교 교실이에요. 교장 선생님께 다가가 보세요.',     // [확인 전]
       principal: {
         name: '교장 선생님',                                          // [확인 전]
         look: { skin: '#FFE0C7', hair: '#6E7FA8', hairStyle: 2, shirt: '#5E9E6E', pants: '#3B3B4F' },
         lines: [
           '안녕하세요! 르망 한글학교에 온 것을 환영해요.',
-          '저는 이 학교 교장 선생님이에요. 르망에서는 저와 같이 \'시간 말하기\'를 연습해 볼 거예요.',
-          '제가 같이 가는 친구가 될게요. 알맞은 말을 골라 보세요.'
+          '저는 이 학교 교장 선생님이에요. 우리 학교 퀴즈를 내 볼게요. 맞혀 보세요!'
         ]
       },
       items: {
+        bbs: { url: 'https://padlet.com/humanteacher89/padlet-s024s1j4y7p2v3kic1bo' },   // 10-24 휴먼쌤 "모든 교실의 게시판은 우선 이 링크". 학교가 관리자 페이지에서 바꾸면 그 주소
         book: {
           title: '르망',
           sub: 'Le Mans · 페이드라루아르',
