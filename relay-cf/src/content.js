@@ -5,7 +5,7 @@
 //   서버는 계정마다 무작위 소금을 붙여 SHA-256으로 한 번 더 바꿔 저장한다(무거운 계산은 브라우저가, 서버는 무료 플랜 CPU 한도 안).
 // 첫 관리자: wrangler.jsonc의 ADMIN_SETUP_HASH(1회용 설정 코드의 SHA-256)와 맞는 코드를 넣은 사람이 만든다.
 //   코드를 새로 만들어 배포하면 관리자 비밀번호를 다시 정할 수 있다(그때 모든 로그인이 풀린다). 쓴 코드는 다시 못 쓴다.
-// 로그인 5번 틀리면 15분 잠김(아이디별·접속 주소별). 사진은 한 장 1.8MB까지(관리자 페이지가 1600px JPEG로 줄여 올린다).
+// 로그인: 아이디별 10번 틀리면 5분 잠김, 접속 주소별은 50번(연수장 와이파이처럼 여럿이 한 주소를 쓰므로 넉넉히, 2026-10-25 휴먼쌤 "15분후 다시 하라는 에러메세지 … 초기화하거나 수정해줘"). 사진은 한 장 1.8MB까지(관리자 페이지가 1600px JPEG로 줄여 올린다).
 // 시드(seed-fr.js, 2026-10-07): 공개 자료 조사로 모은 학교 홈페이지·책 글·TV 영상·링크를 저장소의 비어 있는 칸에만 한 번 넣는다.
 //   관리자 페이지에서 고친 값은 건드리지 않고, 시드 version을 올려 다시 배포하면 그때 비어 있는 칸만 다시 채운다.
 // 2026-10-09: map 'xr' = 가상융합교육 지도(my-3d-world/xr/, 관리자 페이지 xr/admin/). 같은 저장소(Durable Object)지만 **계정·로그인은 map마다 따로**
@@ -25,7 +25,8 @@ const MAX_IMG = 1800000;               // SQLite 행 하나 2MB 한도 아래
 const MAX_IMGS_SCHOOL = 60;
 const MAX_IMG_TOTAL = 800 * 1000000;   // 사진 전체 800MB까지(무료 플랜은 Durable Object 하나에 1GB, 계정 전체 5GB)
 const SESSION_MS = 14 * 864e5;         // 로그인 유지 14일
-const LOCK_FAILS = 5, LOCK_MS = 15 * 60e3;
+const LOCK_FAILS = 10, LOCK_IP_FAILS = 50, LOCK_MS = 5 * 60e3;
+const FAILS_RESET = '20261025';        // 이 값을 바꿔 배포하면 그때 걸려 있던 잠금이 모두 풀린다
 const ORPHAN_MS = 6 * 3600e3;          // 올렸지만 교실에 저장하지 않은 사진은 6시간 뒤 그 교실을 저장할 때 지운다
 
 const enc = new TextEncoder();
@@ -205,6 +206,7 @@ export class Content {
     this.run('CREATE TABLE IF NOT EXISTS sess (h TEXT PRIMARY KEY, name TEXT, exp INTEGER, at INTEGER)');
     this.run('CREATE TABLE IF NOT EXISTS fails (k TEXT PRIMARY KEY, n INTEGER, first INTEGER, until INTEGER)');
     this.run('CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)');
+    if (this.meta('failsReset') !== FAILS_RESET) { this.run('DELETE FROM fails'); this.setMeta('failsReset', FAILS_RESET); }
   }
   rows(s, ...b) { return this.sql.exec(s, ...b).toArray(); }
   row(s, ...b) { return this.rows(s, ...b)[0] || null; }
@@ -321,11 +323,11 @@ export class Content {
     const r = this.row('SELECT until FROM fails WHERE k = ?', k);
     if (r && r.until && r.until > Date.now()) throw new E(429, 'locked', { wait: Math.ceil((r.until - Date.now()) / 60000) });
   }
-  fail(k) {
+  fail(k, max = LOCK_FAILS) {
     const now = Date.now(), r = this.row('SELECT n, first FROM fails WHERE k = ?', k);
     const n = (!r || now - r.first > LOCK_MS) ? 1 : r.n + 1, first = (!r || now - r.first > LOCK_MS) ? now : r.first;
     this.run('INSERT INTO fails (k, n, first, until) VALUES (?, ?, ?, ?) ON CONFLICT(k) DO UPDATE SET n = excluded.n, first = excluded.first, until = excluded.until',
-      k, n, first, n >= LOCK_FAILS ? now + LOCK_MS : 0);
+      k, n, first, n >= max ? now + LOCK_MS : 0);
   }
   async putUser(name, role, schools, key) {
     const now = Date.now(), u = this.getUser(name);
@@ -370,7 +372,7 @@ export class Content {
     this.lockCheck(ukk);
     const u = this.getUser(uk);
     const ok = !!u && same(await sha(u.salt + key), u.hash);
-    if (!ok) { this.fail(ipk); this.fail(ukk); throw new E(401, 'login'); }
+    if (!ok) { this.fail(ipk, LOCK_IP_FAILS); this.fail(ukk); throw new E(401, 'login'); }
     this.run('DELETE FROM fails WHERE k = ?', ukk);
     return this.issue(uk);
   }

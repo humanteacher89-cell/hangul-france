@@ -1,6 +1,6 @@
 // 프랑스 한글학교 로비 설정 v0.2. 화면 글·학교·지역 색·학교 공간(교실) 내용은 여기서만 고친다.
 // [확인 전] = 휴먼쌤 확인 전 문구. [예시] = 휴먼쌤이 줄 글·사진·영상으로 바꿀 자리.
-// 학교 목록: 하위 에이전트 웹 조사(2026-10-05, 자료\한글학교-목록.md → 10-06 실존 확인 자료\한글학교-실존확인-20261006.md, 20곳·소재지 좌표). 10-06 휴먼쌤 결정으로 숄레·디종·리옹 한글학교 3곳을 지도에서도 빼 17곳, 10-24 리옹 에콜리움도 빼 로비 학교 목록 정본은 16곳.
+// 학교 목록: 하위 에이전트 웹 조사(2026-10-05, 자료\한글학교-목록.md → 10-06 실존 확인 자료\한글학교-실존확인-20261006.md, 20곳·소재지 좌표). 10-06 휴먼쌤 결정으로 숄레·디종·리옹 한글학교 3곳을 지도에서도 빼 17곳, 10-24 리옹 에콜리움도 뺐다가 10-25 휴먼쌤 "에콜리움 한글학교가 목록에 없어 이 공간을 만들어주고" → 다시 넣어 로비 학교 목록 정본은 17곳.
 window.LOBBY_CONFIG = {
   version: 'v0.2',
   text: {
@@ -150,13 +150,14 @@ window.LOBBY_CONFIG = {
   },
   // 멀티플레이: 같은 폴더 relay.json의 중계 서버 주소를 읽는다(없으면 혼자 보기). 주소 ?mp=0 끔, ?mp=ws://…/ws 시험 서버
   multiplayer: { file: 'relay.json', lobbyRoom: 'fr:lobby', roomPrefix: 'fr:', sendHz: 4 },   // sendHz: 움직일 때 초당 보내는 횟수(Cloudflare 무료 한도 때문에 낮게. 60명 예정이라 10-06 6 → 4)
-  // 한글학교 16곳(휴먼쌤 2026-10-06 결정: 조사한 20곳에서 숄레·디종·리옹 한글학교 3곳을 지도에서도 뺌. 10-24 리옹 에콜리움도 뺌). 실존 확인 2026-10-06(하위 에이전트, 자료\한글학교-실존확인-20261006.md): 주프랑스 대사관 연락처 표(원문)·한국교육원 지도·
+  // 한글학교 17곳(휴먼쌤 2026-10-06 결정: 조사한 20곳에서 숄레·디종·리옹 한글학교 3곳을 지도에서도 뺌. 10-24 리옹 에콜리움을 뺐다가 10-25 휴먼쌤 지시로 다시 넣음). 실존 확인 2026-10-06(하위 에이전트, 자료\한글학교-실존확인-20261006.md): 주프랑스 대사관 연락처 표(원문)·한국교육원 지도·
   // 스터디코리안 한글학교 정보(2026-01)에 모두 있는 곳 = 등급 ◎. 좌표는 학교 소재지(번지 수준). 연구부 '검증' 딱지는 아직 아님.
   // pending: true = 아직 확인 중(지금은 없음. 뺀 숄레가 그랬다). rooms에 같은 id가 있으면 입장할 때 그 교실로 들어간다
   schools: [
     { id: 'paris', name: '파리 한글학교', nameFr: 'École coréenne de Paris', city: '파리', lon: 2.3627, lat: 48.8250, web: 'https://www.helloasso.com/associations/ecole-coreenne-de-paris' },
     { id: 'opera', name: '오페라 한글학교', nameFr: "École coréenne de l'Opéra de Paris", city: '파리', lon: 2.3362, lat: 48.8743, web: 'https://www.instagram.com/hangeul75009/' },
     { id: 'arissol', name: '파리 아리솔 한글학교', nameFr: 'École coréenne Arissol', city: '파리', lon: 2.3302, lat: 48.8553, web: 'https://fr.arissol-association.com/' },
+    { id: 'lium', name: '리옹 에콜리움 한글학교', nameFr: 'Lium École coréenne', city: '리옹', lon: 4.8323, lat: 45.7547, web: 'https://www.ecolelium.com/' },
     { id: 'grenoble', name: '그르노블 한글학교', nameFr: 'Association franco-coréenne de Grenoble et de l\'Isère', city: '그르노블', lon: 5.8229, lat: 45.1913, web: 'https://afcgi.wordpress.com/' },
     { id: 'strasbourg', name: '스트라스부르 한글학교', nameFr: 'École coréenne de Strasbourg', city: '스트라스부르', lon: 7.7779, lat: 48.5821, web: 'https://ecolecoreenne.blogspot.com/' },
     { id: 'toulouse', name: '툴루즈 한글학교', nameFr: 'École coréenne de Toulouse', city: '툴루즈', lon: 1.3916, lat: 43.5853, web: '' },
@@ -478,6 +479,82 @@ window.LOBBY_CONFIG = {
                 { ko: '어서 오세요!', hint: '손님을 맞는 말이에요. 지금은 헤어지는 인사를 해요.' },
                 { ko: '이름이 뭐예요?', hint: '벌써 아는 사이예요. 인사로 끝내요.' },
                 { ko: '저도 즐거웠어요. 안녕히 가세요!', ok: true, note: '헤어질 때는 \'안녕히 가세요\'라고 인사해요.' }
+              ] }
+          ]
+        }
+      ]
+    },
+    lium: {
+      theme: {
+        wall: '#FFF4E0', wainscot: '#E6C99B', floor: ['#DDB27F', '#D2A672', '#E7C092'], rug: '#E8A598', board: '#6B3E2E',
+        sky: '#FBE6CF',
+        view: { kind: 'river', sky: ['#F7C99B', '#FDF1E0'], far: '#E3B9A0', near: '#C98F78', water: '#8FB9D6', accent: '#E8836B' },
+        poster: { title: '리옹', sub: 'Lyon · Auvergne-Rhône-Alpes', kind: 'basilica', color: '#C97B5A', foot: 'Auvergne-Rhône-Alpes · France' }
+      },
+      boardTitle: '리옹 에콜리움 한글학교',
+      boardLine: '',   // 칠판 한 줄: 학교가 관리자 페이지에서 넣는다(10-24 휴먼쌤 "칠판에 '오늘의 회화'는 삭제")
+      welcome: '리옹 에콜리움 한글학교 교실이에요. 교장 선생님께 다가가 보세요.',   // [확인 전]
+      principal: {
+        name: '교장 선생님',                                          // [확인 전]
+        look: { skin: '#C98E66', hair: '#2B2420', hairStyle: 2, shirt: '#D9822B', pants: '#3B3B4F' },
+        lines: [
+          '안녕하세요! 리옹 에콜리움 한글학교에 온 것을 환영해요.',
+          '저는 이 학교 교장 선생님이에요. 우리 학교 퀴즈를 내 볼게요. 맞혀 보세요!'
+        ]
+      },
+      items: {
+        bbs: { url: 'https://padlet.com/humanteacher89/padlet-s024s1j4y7p2v3kic1bo' },   // 10-24 휴먼쌤 "모든 교실의 게시판은 우선 이 링크". 학교가 관리자 페이지에서 바꾸면 그 주소
+        book: {
+          title: '리옹',
+          sub: 'Lyon · 오베르뉴론알프',
+          text: '리옹은 프랑스 남동쪽에 있는 큰 도시예요. 도시 안으로 론강과 손강, 두 강이 흘러요.\n\n언덕 위에는 하얀 성당이 서 있고, 맛있는 음식으로도 이름난 도시예요.\n\n(이 글은 보기 글이에요. 휴먼쌤이 주시는 소개 글로 바뀝니다.)',
+          sample: true
+        },
+        album: {
+          title: '리옹 에콜리움 한글학교 사진첩',
+          photos: [],
+          captions: ['수업 시간', '한글날 행사', '운동회', '졸업식']
+        },
+        tv: {
+          title: '리옹 소개 영상',
+          video: '',
+          sample: true
+        }
+      },
+      // 한국어 회화 상황 [예시, 확인 전]
+      situations: [
+        {
+          id: 'order', title: '음식 주문하기', npcRole: '식당 직원',
+          steps: [
+            { npc: '어서 오세요! 몇 분이세요?',
+              choices: [
+                { ko: '두 명이에요.', ok: true },
+                { ko: '안녕히 계세요.', hint: '들어오자마자 하는 인사가 아니에요. 사람 수를 말해요.' },
+                { ko: '저는 열 살이에요.', hint: '몇 명인지 물었어요.' }
+              ] },
+            { npc: '여기 메뉴예요. 무엇을 드릴까요?',
+              choices: [
+                { ko: '내일 봐요.', hint: '헤어질 때 하는 말이에요. 먹고 싶은 것을 말해요.' },
+                { ko: '피자 하나 주세요.', ok: true },
+                { ko: '제 이름은 민준이에요.', hint: '이름을 묻지 않았어요. 주문을 해요.' }
+              ] },
+            { npc: '마실 것은 무엇으로 드릴까요?',
+              choices: [
+                { ko: '물 주세요.', ok: true },
+                { ko: '토요일에 만나요.', hint: '약속 이야기가 아니에요. 마실 것을 골라요.' },
+                { ko: '파리에 살아요.', hint: '사는 곳을 묻지 않았어요.' }
+              ] },
+            { npc: '음식 나왔어요. 맛있게 드세요!',
+              choices: [
+                { ko: '처음 뵙겠습니다.', hint: '처음 만날 때 하는 인사예요.' },
+                { ko: '어디에 살아요?', hint: '음식을 받았을 때 하는 말이 아니에요.' },
+                { ko: '고맙습니다. 잘 먹겠습니다!', ok: true }
+              ] },
+            { npc: '맛있게 드셨어요? 안녕히 가세요!',
+              choices: [
+                { ko: '네, 맛있었어요. 안녕히 계세요!', ok: true, note: '식당에 남는 사람에게는 \'안녕히 계세요\'라고 해요.' },
+                { ko: '어서 오세요!', hint: '손님을 맞을 때 직원이 하는 말이에요.' },
+                { ko: '피자 하나 주세요.', hint: '이미 다 먹었어요. 인사로 끝내요.' }
               ] }
           ]
         }
