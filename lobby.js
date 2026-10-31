@@ -454,6 +454,31 @@
     for (const grp of groups) for (const L of LANDMARKS) {
       if (grp.some(s => Math.hypot(s.x - L.x, s.z - L.z) < L.r)) grp.forEach(s => { s.z = L.z + L.r; });
     }
+    // 학교가 촘촘한 나라(config.layout.relax, 독일·영국)는 그래도 겹치는 건물을 조금씩 밀어 떼어 놓는다. 프랑스는 이 칸이 없어 그대로
+    if (C.layout && C.layout.relax) {
+      const MIN = C.layout.minGap || 3.3;
+      for (let it = 0; it < 40; it++) {
+        let moved = false;
+        for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+          const a = list[i], b = list[j];
+          let dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz);
+          if (d >= MIN) continue;
+          if (d < 1e-6) { dx = 1; dz = 0; d = 1; }
+          const k = (MIN - d) / 2 / d;
+          a.x -= dx * k; a.z -= dz * k; b.x += dx * k; b.z += dz * k;
+          moved = true;
+        }
+        if (!moved) break;
+      }
+      // 이름판 층: 가까운(기본 6칸 안) 학교끼리는 서로 다른 층을 받아 전체 지도에서 계단처럼 쌓인다(무리 안의 층은 그대로 둔다)
+      const NEAR = C.layout.signGap || 6;
+      const byX = list.slice().sort((p, q) => p.x - q.x);
+      for (const s of byX) {
+        const used = new Set(byX.filter(o => o !== s && o.stackSet && Math.hypot(o.x - s.x, o.z - s.z) < NEAR).map(o => o.stack));
+        let st = 0; while (used.has(st)) st++;
+        s.stack = st; s.stackSet = true;
+      }
+    }
     for (const s of list) {
       // 바닷가 학교는 땅 안쪽으로 조금씩 옮긴다(건물과 발판이 모두 땅 위에 오도록)
       const okAt = (x, z) => regionAt(x, z) && regionAt(x - 1.2, z) && regionAt(x + 1.2, z) && regionAt(x, z - 1) && regionAt(x, z + 2.5);
@@ -964,7 +989,7 @@
   }
   function hideCard() { $('card').hidden = true; CUR_SCHOOL = null; CUR_TARGET = null; }
   function schoolCard(s) {
-    showCard({ name: s.name, sub: [s.city, s.regionName].filter(Boolean).join(' · '), pending: s.pending, web: s.web, btn: T.enter, go: () => openEnter(s) });
+    showCard({ name: s.name, sub: [s.city, s.regionName !== s.city ? s.regionName : ''].filter(Boolean).join(' · '), pending: s.pending, web: s.web, btn: T.enter, go: () => openEnter(s) });
   }
   function openEnter(s) {
     if (C.rooms && C.rooms[s.id]) { enterRoom(s); return; }
@@ -1005,7 +1030,7 @@
       CAM.tx = ME.x; CAM.tz = ME.z; CAM.d = w.camD(); CAM.pitch = w.pitch;
       updateCam(0, true);
       $('title').textContent = s.name;
-      $('region').textContent = [s.city, s.regionName].filter(Boolean).join(' · ');
+      $('region').textContent = [s.city, s.regionName !== s.city ? s.regionName : ''].filter(Boolean).join(' · ');
       $('btnMap').hidden = true; $('btnList').hidden = true; $('btnLobby').hidden = false;
       $('list').hidden = true;
       $('hint').textContent = T.hintRoom; $('hint').style.opacity = 1;
