@@ -654,6 +654,7 @@
     const i = CHARS.indexOf(ch);
     if (i >= 0) CHARS.splice(i, 1);
     if (ch.tag) { ch.tag.removeFromParent(); ch.tag.material.map.dispose(); ch.tag.material.dispose(); ch.tag = null; }
+    dropBubble(ch);
   }
   // 생김새는 번호 5개(피부·머리색·옷·바지·머리 모양)로 저장하고 주고받는다. 그릴 때 색으로 바꾼다
   function randomIdx(R) {
@@ -781,7 +782,11 @@
   }
   function updateBot(ch, dt) {
     const b = ch.bot;
-    if (b.wait > 0) { b.wait -= dt; ch.moving = false; return; }
+    if (b.wait > 0) {
+      b.wait -= dt; ch.moving = false;
+      if (CHAT && !ch.bubble && Math.random() < dt * 0.06) sayShow(ch, Math.floor(Math.random() * CHAT.phrases.length), false);   // 시험용 참가자도 가끔 말풍선(기록에는 안 남김)
+      return;
+    }
     const dx = b.tx - ch.x, dz = b.tz - ch.z;
     if (Math.hypot(dx, dz) < 0.3) { ch.moving = false; b.wait = 1 + BR() * 4; pickBotTarget(ch); return; }
     if (stepChar(ch, dx, dz, dt)) b.stuck = 0;
@@ -1011,7 +1016,7 @@
   function switchWorld(w) {
     WORLD = w;
     for (const m of SHARED) w.scene.add(m);
-    for (const ch of CHARS) if (ch.tag) { ch.tag.removeFromParent(); ch.tag.material.map.dispose(); ch.tag.material.dispose(); ch.tag = null; }
+    for (const ch of CHARS) { if (ch.tag) { ch.tag.removeFromParent(); ch.tag.material.map.dispose(); ch.tag.material.dispose(); ch.tag = null; } dropBubble(ch); }
     ME.world = w.id;
   }
   function enterRoom(s) {
@@ -1112,7 +1117,7 @@
     $('bookTag').textContent = T.sampleTag;
     if ($('cardWeb')) $('cardWeb').textContent = T.homepage || '홈페이지';
     $('btnMap').addEventListener('click', () => setMode(CAM.mode === 'over' ? 'follow' : 'over'));
-    $('btnList').addEventListener('click', () => { $('list').hidden = !$('list').hidden; });
+    $('btnList').addEventListener('click', () => { $('list').hidden = !$('list').hidden; if (!$('list').hidden && $('chatBox')) $('chatBox').hidden = true; });
     $('btnListClose').addEventListener('click', () => { $('list').hidden = true; });
     $('btnEnter').addEventListener('click', () => { if (CUR_TARGET && !PAUSED) CUR_TARGET.go(); });
     $('btnBack').addEventListener('click', () => { $('enter').hidden = true; });
@@ -1124,6 +1129,7 @@
       a.className = 'pill'; a.href = C.europeUrl; a.textContent = T.europe || '유럽 지도로'; a.style.textDecoration = 'none';
       $('btnProfile').parentNode.insertBefore(a, $('btnProfile'));
     }
+    chatSetup();   // 말풍선 대화(config.chat이 있을 때만)
     buildList();
     setTimeout(() => { $('hint').style.opacity = 0; }, 7000);
     if (SHOW_STAT) $('stat').hidden = false;
@@ -1246,6 +1252,7 @@
     drawCrowd(t, dt);
     updateCam(dt, false);
     updateTags(dt);
+    updateBubbles(dt);
     mpUpdate(dt);
     renderer.render(WORLD.scene, camera);
     if (firstFrame) { firstFrame = false; const L = $('loading'); L.style.opacity = 0; setTimeout(() => { L.hidden = true; }, 450); }
@@ -1364,6 +1371,7 @@
     else if (m.t === 'leave') mpRemove(m.id);
     else if (m.t === 'snap') { (m.ps || []).forEach(a => { const p = MP.peers.get(a[0]); if (p) mpSet(p, a.slice(1)); }); }
     else if (m.t === 'full') { MP.full = true; showToast(T.mpFull, 4); }
+    else if (m.t === 'say') sayShow(MP.peers.get(m.id), m.k | 0);   // 말풍선(번호만 온다)
   }
   function mpAdd(d) {
     if (!d || d.id === MP.id || MP.peers.has(d.id)) return;
@@ -1387,6 +1395,105 @@
     mpBadge(MP.state);
   }
   function mpClear() { [...MP.peers.keys()].forEach(mpRemove); }
+
+  /* ─────────────────────────────────────────────────────────────
+     CHAT — 말풍선 대화(2026-10-31, 휴먼쌤 "채팅기능 넣어줘"). config.chat.phrases에서 하나를 고르면 내 머리 위에 4.5초 뜨고,
+     같은 방 사람들에게는 번호만 보낸다({t:'say', k}). 자유 글은 없다 — 아이들이 모르는 사람과 만나는 공간이라 나쁜 말·개인 정보가 오가지 않게.
+     왼쪽 아래 '대화 기록'에 최근 4줄(9초 뒤 흐려짐). 혼자 보기(서버 없음)면 나에게만 보인다. 서버가 1.2초에 한 번만 받는다.
+     ───────────────────────────────────────────────────────────── */
+  const CHAT = C.chat && Array.isArray(C.chat.phrases) && C.chat.phrases.length ? C.chat : null;
+  const BUBBLE_SEC = 4.5, BUBBLE_TEX = new Map();
+  let chatNext = 0, chatSoloTold = false;
+  function bubbleTexOf(k) {
+    if (BUBBLE_TEX.has(k)) return BUBBLE_TEX.get(k);
+    const text = CHAT.phrases[k].ko;
+    const tex = canvasTex(512, 176, (g, w) => {
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      fitFont(g, text, 'normal', 64, FONT_D, w - 84);
+      const tw = Math.min(w - 12, g.measureText(text).width + 70), x = (w - tw) / 2;
+      g.fillStyle = 'rgba(30,43,74,0.18)'; pill(g, x, 16, tw, 112); g.fill();
+      g.fillStyle = '#FFFFFF'; pill(g, x, 8, tw, 112); g.fill();
+      g.lineWidth = 6; g.strokeStyle = '#2A4D9B'; pill(g, x + 3, 11, tw - 6, 106); g.stroke();
+      g.beginPath(); g.moveTo(w / 2 - 20, 114); g.lineTo(w / 2, 158); g.lineTo(w / 2 + 20, 114); g.closePath(); g.fillStyle = '#FFFFFF'; g.fill();
+      g.beginPath(); g.moveTo(w / 2 - 20, 117); g.lineTo(w / 2, 158); g.lineTo(w / 2 + 20, 117); g.stroke();
+      g.fillStyle = '#1E2B4A'; g.fillText(text, w / 2, 66);
+    });
+    BUBBLE_TEX.set(k, tex);
+    return tex;
+  }
+  function dropBubble(ch) {
+    if (!ch || !ch.bubble) return;
+    ch.bubble.removeFromParent(); ch.bubble.material.dispose(); ch.bubble = null;
+  }
+  function sayShow(ch, k, log) {
+    if (!ch || !CHAT || !CHAT.phrases[k]) return;
+    dropBubble(ch);
+    ch.bubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: bubbleTexOf(k), transparent: true, depthWrite: false }));
+    ch.bubble.renderOrder = 6;
+    ch.bubbleT = BUBBLE_SEC;
+    WORLD.scene.add(ch.bubble);
+    if (log !== false) chatLog(ch === ME ? (ME.name || T.me) : (ch.name || T.guest), CHAT.phrases[k].ko, ch === ME);
+  }
+  function updateBubbles(dt) {
+    for (const ch of CHARS) {
+      if (!ch.bubble) continue;
+      ch.bubbleT -= dt;
+      if (ch.bubbleT <= 0 || ch.world !== WORLD.id) { dropBubble(ch); continue; }
+      const w = TAG_W * 1.9, h = w * 176 / 512;
+      ch.bubble.scale.set(w, h, 1);
+      ch.bubble.position.set(ch.x, LAND_Y + 1.8 + TAG_W * 0.32 + h * 0.5, ch.z);
+      ch.bubble.material.opacity = Math.min(1, ch.bubbleT / 0.5);
+      ch.bubble.visible = CAM.mode !== 'over';
+    }
+  }
+  function chatLog(name, text, me) {
+    const box = $('chatLog');
+    if (!box) return;
+    const ln = document.createElement('div');
+    ln.className = 'ln' + (me ? ' me' : '');
+    const b = document.createElement('b'); b.textContent = name;
+    ln.append(b, document.createTextNode(text));
+    box.appendChild(ln);
+    while (box.children.length > 4) box.firstChild.remove();
+    setTimeout(() => { ln.classList.add('out'); setTimeout(() => ln.remove(), 700); }, 9000);
+  }
+  function chatSay(k) {
+    const now = performance.now();
+    if (now < chatNext) { showToast(T.chatWait || '조금 뒤에 다시 말할 수 있어요', 1.5); return; }
+    chatNext = now + 1300;
+    sayShow(ME, k);
+    if (MP.ws && MP.ws.readyState === 1 && MP.id != null) { try { MP.ws.send(JSON.stringify({ t: 'say', k })); } catch (_) { /* 끊기면 onclose가 처리 */ } }
+    else if (!chatSoloTold) { chatSoloTold = true; showToast(T.chatSolo || '지금은 혼자 보기라서 나에게만 보여요', 2.5); }
+  }
+  function chatSetup() {
+    const btn = $('btnChat');
+    if (!CHAT || !btn) return;
+    btn.hidden = false;
+    $('btnChatTxt').textContent = T.chatBtn || '말하기';
+    $('chatTitle').textContent = T.chatTitle || '말풍선 고르기';
+    $('btnChatClose').textContent = T.close;
+    $('chatNote').textContent = T.chatNote || '';
+    const body = $('chatBody');
+    body.textContent = '';
+    (CHAT.groups || ['']).forEach((gname, gi) => {
+      const items = CHAT.phrases.map((p, k) => ({ p, k })).filter(o => (o.p.g || 0) === gi);
+      if (!items.length) return;
+      const sec = document.createElement('section'); sec.className = 'grp';
+      if (gname) { const h = document.createElement('h3'); h.textContent = gname; sec.appendChild(h); }
+      const grid = document.createElement('div'); grid.className = 'phr';
+      for (const { p, k } of items) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'ph';
+        const ko = document.createElement('span'); ko.className = 'ko'; ko.textContent = p.ko;
+        b.appendChild(ko);
+        if (p.hint) { const lc = document.createElement('span'); lc.className = 'lc'; lc.textContent = p.hint; b.appendChild(lc); }
+        b.addEventListener('click', () => { $('chatBox').hidden = true; chatSay(k); });
+        grid.appendChild(b);
+      }
+      sec.appendChild(grid); body.appendChild(sec);
+    });
+    btn.addEventListener('click', () => { const box = $('chatBox'); box.hidden = !box.hidden; if (!box.hidden) $('list').hidden = true; });
+    $('btnChatClose').addEventListener('click', () => { $('chatBox').hidden = true; });
+  }
 
   // 실행 시간 절약(2026-10-12): 탭이 가려지거나 5분 동안 아무 입력이 없으면 접속을 끊고, 돌아오면 다시 잇는다. 가만히 있을 땐 45초마다 ping만 보낸다(서버가 깨우지 않고 pong으로 답한다)
   MP.asleep = false; MP.begun = false; MP.lastIn = Date.now();

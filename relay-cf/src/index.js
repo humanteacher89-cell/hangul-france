@@ -6,6 +6,8 @@
 //   그래서 중계 타이머는 바뀐 상태가 있을 때만 한 번 걸고, ping은 자동 응답(깨우지 않음), 말 없는 소켓은 알람으로 정리한다.
 // 2026-10-06: /api/* = 관리자 페이지용 내용 저장소(src/content.js, Durable Object 'Content' 하나에 학교 링크·교실 글·사진·계정).
 // 2026-10-31: 독일 로비('de:lobby'·'de:<학교 id>')·영국 로비('uk:lobby'·'uk:<학교 id>')도 같은 서버. 방은 이름만 다르면 따로 돈다.
+// 2026-10-31: 말풍선 대화(휴먼쌤 "채팅기능 넣어줘"). 받는 것 {t:'say', k: 표현 번호(0~63)}, 같은 방 다른 사람에게 {t:'say', id, k}로 넘긴다.
+//   글은 오가지 않는다(표현 글은 각 로비 설정에 있음) — 나쁜 말·개인 정보가 서버를 지나지 않는다. 한 사람 1.2초에 한 번, 저장하지 않음.
 'use strict';
 import { handleApi, Content } from './content.js';
 export { Content };
@@ -15,6 +17,8 @@ const TICK_MS = 100;
 const SWEEP_MS = 30000;    // 알람 간격: 소켓이 있는 동안만 30초마다 한 번 깨어 정리한다(알람은 객체를 계속 깨워 두지 않는다)
 const IDLE_MS = 150000;    // 이 시간 동안 메시지도 ping도 없는 소켓은 끊는다(클라이언트는 45초마다 ping)
 const ORIGINS = ['https://humanteacher89-cell.github.io'];
+const SAY_MAX = 63;        // 말풍선 표현 번호 상한
+const SAY_MS = 1200;       // 한 사람이 말풍선을 보낼 수 있는 간격
 
 const cleanName = v => String(v ?? '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, 12);
 const cleanRoom = v => String(v ?? '').replace(/[^\w가-힣:-]/g, '').slice(0, 40) || 'lobby';
@@ -70,6 +74,7 @@ export class Room {
     // 클라이언트의 'ping' 문자열에는 객체를 깨우지 않고 'pong'으로 자동 응답한다(2026-10-12: 실행 시간 한도 대응)
     this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
     this.counts = new Map();
+    this.sayAt = new Map();
     this.nextId = 1;
     for (const ws of this.ctx.getWebSockets()) { const a = att(ws); if (a.id && a.id >= this.nextId) this.nextId = a.id + 1; }
   }
@@ -115,7 +120,19 @@ export class Room {
     if (m.t === 's') {
       const s = cleanState(m.s);
       if (s) { a.s = s; a.u = Date.now(); ws.serializeAttachment(a); this.dirty.add(ws); this.scheduleTick(); }
-    }
+    } else if (m.t === 'say') this.say(ws, a, m);
+  }
+
+  // 말풍선: 번호만 확인해 같은 방 다른 사람에게 바로 넘긴다(글은 없음)
+  say(ws, a, m) {
+    const k = Number(m.k);
+    if (!Number.isInteger(k) || k < 0 || k > SAY_MAX) return;
+    const now = Date.now();
+    if (now - (this.sayAt.get(ws) || 0) < SAY_MS) return;
+    this.sayAt.set(ws, now);
+    a.u = now; ws.serializeAttachment(a);
+    const msg = JSON.stringify({ t: 'say', id: a.id, k });
+    for (const o of this.ctx.getWebSockets()) if (o !== ws && att(o).id) safeSend(o, msg);
   }
 
   join(ws, a, m) {
@@ -144,6 +161,7 @@ export class Room {
   leave(ws) {
     this.dirty.delete(ws);
     this.counts.delete(ws);
+    this.sayAt.delete(ws);
     const a = att(ws);
     if (!a.id) return;
     const msg = JSON.stringify({ t: 'leave', id: a.id });

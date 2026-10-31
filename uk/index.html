@@ -139,6 +139,23 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--sky);color:var(-
 .loading{position:fixed;inset:0;display:grid;place-items:center;background:var(--sky);font-family:var(--font-display);font-size:20px;color:var(--ink);z-index:12;transition:opacity .4s;padding:16px;text-align:center}
 @media (max-width:480px){.btns{flex-direction:column;align-items:flex-end}.toast{top:calc(env(safe-area-inset-top,0px) + 126px)}.chipwrap{max-width:58vw}}
 .chip .credit{margin:3px 0 0;font-size:10.5px;opacity:.55;letter-spacing:.02em}   /* 2026-10-13 휴먼쌤 "표기해줘" */
+/* 말풍선 대화(2026-10-31 휴먼쌤 "채팅기능 넣어줘"): 오른쪽 아래 '말하기' 단추 → 표현 고르기 판, 왼쪽 아래 대화 기록 */
+.chatbtn{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 96px);z-index:6;appearance:none;border:0;border-radius:999px;padding:11px 16px 11px 13px;display:inline-flex;align-items:center;gap:8px;font:700 14px/1 var(--font-body);color:var(--paper);background:var(--blue);box-shadow:var(--shadow);cursor:pointer}
+.chatbtn .ico{width:20px;height:15px;border-radius:7px;background:var(--paper);position:relative;flex:0 0 auto}
+.chatbtn .ico::after{content:"";position:absolute;left:4px;bottom:-5px;border:5px solid transparent;border-top-color:var(--paper);border-bottom:0}
+.chatbtn:focus-visible{outline:3px solid var(--red);outline-offset:2px}
+.chatlog{position:fixed;left:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);z-index:4;display:flex;flex-direction:column;align-items:flex-start;gap:4px;max-width:min(320px,calc(100vw - 150px));pointer-events:none}
+.chatlog .ln{background:var(--glass);border-radius:12px;padding:6px 10px;font-size:13px;line-height:1.35;color:var(--ink);box-shadow:var(--shadow);transition:opacity .6s;overflow-wrap:anywhere}
+.chatlog .ln b{font-weight:700;color:var(--blue);margin-right:6px}
+.chatlog .ln.me b{color:var(--red)}
+.chatlog .ln.out{opacity:0}
+@media (pointer:coarse){.chatlog{bottom:calc(env(safe-area-inset-bottom,0px) + 236px)}}
+.chatbox .phr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.chatbox .ph{appearance:none;border:0;background:var(--soft);border-radius:14px;padding:10px 12px;text-align:left;font:inherit;color:var(--ink);cursor:pointer;display:flex;flex-direction:column;justify-content:center;gap:2px;min-height:54px}
+.chatbox .ph .ko{font-family:var(--font-display);font-size:17px;line-height:1.25}
+.chatbox .ph .lc{font-size:11.5px;color:var(--ink-2);line-height:1.3}
+.chatbox .ph:active{background:#E1E9F6}
+.chatbox .ph:focus-visible{outline:3px solid var(--red);outline-offset:1px}
 @media (prefers-reduced-motion:reduce){.fade,.hint,.loading{transition:none}}
 </style>
 
@@ -155,6 +172,13 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--sky);color:var(-
 </div>
 <div id="joy" class="joy" hidden><div id="knob" class="knob"></div></div>
 <div id="stat" class="stat" hidden></div>
+<button id="btnChat" class="chatbtn" type="button" hidden aria-haspopup="dialog"><span class="ico" aria-hidden="true"></span><span id="btnChatTxt"></span></button>
+<div id="chatLog" class="chatlog" aria-live="polite"></div>
+<div id="chatBox" class="sheet chatbox" hidden role="dialog" aria-labelledby="chatTitle">
+  <header><h2 id="chatTitle"></h2><button id="btnChatClose" class="pill" type="button"></button></header>
+  <div id="chatBody" class="body"></div>
+  <p id="chatNote" class="note" style="padding:0 20px 16px"></p>
+</div>
 <div id="list" class="sheet" hidden role="dialog" aria-labelledby="listTitle">
   <header><h2 id="listTitle"></h2><button id="btnListClose" class="pill" type="button"></button></header>
   <div id="listBody" class="body"></div>

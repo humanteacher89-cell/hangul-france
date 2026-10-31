@@ -20,7 +20,7 @@ window.LOBBY_CONFIG = {
     "mapClose": "내 위치로",
     "list": "학교 목록",
     "listTitle": "지역별 한글학교",
-    "listNote": "학교 목록은 주독일 대사관·총영사관 안내와 재외동포청 스터디코리안 한글학교 정보(2026년)로 모아 확인 중입니다(확인 전 시험판). '확인 전' 표시는 올해 운영이 확인되지 않은 곳입니다.",
+    "listNote": "학교 목록은 독일한국교육원 한글학교 소개와 재외동포청 스터디코리안 한글학교 정보(2026년)로 확인했습니다. '확인 전' 표시는 올해 운영이 확인되지 않은 곳입니다.",
     "noSchools": "아직 표시할 학교가 없습니다.",
     "close": "닫기",
     "enter": "입장하기",
@@ -115,7 +115,12 @@ window.LOBBY_CONFIG = {
     "bbsSign": "게시판",
     "bbsBtn": "게시판 열기",
     "bbsSub": "누르면 새 창에서 열려요",
-    "bbsNone": "아직 게시판 주소가 없어요"
+    "bbsNone": "아직 게시판 주소가 없어요",
+    "chatBtn": "말하기",
+    "chatTitle": "말풍선 고르기",
+    "chatNote": "고른 말이 내 머리 위에 떠요. 같은 곳에 있는 사람들이 함께 봐요.",
+    "chatSolo": "지금은 혼자 보기라서 나에게만 보여요",
+    "chatWait": "조금 뒤에 다시 말할 수 있어요"
   },
   look: { sky: '#CDEBF6', sea: '#8DD3EA', base: '#EDE3CC', neighbor: '#DDE5D3', neighborLine: '#B9C4AC' },
   // 지역 코드별 한글·현지어 이름과 색(지도 파일 germany-map.js의 regions[].c). label: 땅에 쓴 이름의 크기(size)와 자리 옮김(dx 동쪽+, dz 남쪽+)
@@ -426,6 +431,116 @@ window.LOBBY_CONFIG = {
   },
   // 멀티플레이: 저장소 루트의 relay.json(프랑스와 같은 서버), 방 이름 앞머리만 다르다
   multiplayer: { file: '../relay.json', lobbyRoom: 'de:lobby', roomPrefix: 'de:', sendHz: 4 },
+  // 말풍선 대화(2026-10-31 휴먼쌤 "채팅기능 넣어줘"): 정해진 한국어 표현만 고른다. 번호가 서버로 가므로 순서를 바꾸지 말고 뒤에만 더한다
+  chat: {
+    "groups": [
+      "인사",
+      "대화",
+      "마음"
+    ],
+    "phrases": [
+      {
+        "ko": "안녕하세요!",
+        "hint": "Hallo!",
+        "g": 0
+      },
+      {
+        "ko": "반가워요!",
+        "hint": "Schön, dich zu sehen!",
+        "g": 0
+      },
+      {
+        "ko": "안녕히 가세요!",
+        "hint": "Tschüss!",
+        "g": 0
+      },
+      {
+        "ko": "또 만나요!",
+        "hint": "Bis bald!",
+        "g": 0
+      },
+      {
+        "ko": "이름이 뭐예요?",
+        "hint": "Wie heißt du?",
+        "g": 1
+      },
+      {
+        "ko": "저는 한국어를 배워요.",
+        "hint": "Ich lerne Koreanisch.",
+        "g": 1
+      },
+      {
+        "ko": "같이 가요!",
+        "hint": "Lass uns zusammen gehen!",
+        "g": 1
+      },
+      {
+        "ko": "여기로 와요!",
+        "hint": "Komm hierher!",
+        "g": 1
+      },
+      {
+        "ko": "교실에 들어가 봐요!",
+        "hint": "Lass uns ins Klassenzimmer gehen!",
+        "g": 1
+      },
+      {
+        "ko": "잠깐만요!",
+        "hint": "Moment mal!",
+        "g": 1
+      },
+      {
+        "ko": "도와줄까요?",
+        "hint": "Kann ich dir helfen?",
+        "g": 1
+      },
+      {
+        "ko": "네!",
+        "hint": "Ja!",
+        "g": 1
+      },
+      {
+        "ko": "아니요.",
+        "hint": "Nein.",
+        "g": 1
+      },
+      {
+        "ko": "고마워요!",
+        "hint": "Danke!",
+        "g": 2
+      },
+      {
+        "ko": "미안해요.",
+        "hint": "Entschuldigung.",
+        "g": 2
+      },
+      {
+        "ko": "괜찮아요.",
+        "hint": "Kein Problem.",
+        "g": 2
+      },
+      {
+        "ko": "좋아요!",
+        "hint": "Super!",
+        "g": 2
+      },
+      {
+        "ko": "재미있어요!",
+        "hint": "Das macht Spaß!",
+        "g": 2
+      },
+      {
+        "ko": "대단해요!",
+        "hint": "Toll!",
+        "g": 2
+      },
+      {
+        "ko": "축하해요!",
+        "hint": "Herzlichen Glückwunsch!",
+        "g": 2
+      }
+    ]
+  },
   // 한글학교 32곳 [확인 전 — 휴먼쌤 확정 전 조사본]
   schools: [
     {

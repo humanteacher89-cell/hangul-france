@@ -96,7 +96,10 @@ window.LOBBY_CONFIG = {
     bbsSign: '게시판',
     bbsBtn: '게시판 열기',
     bbsSub: '누르면 새 창에서 열려요',
-    bbsNone: '아직 게시판 주소가 없어요'
+    bbsNone: '아직 게시판 주소가 없어요',
+    // 말풍선 대화(2026-10-31)
+    chatBtn: '말하기', chatTitle: '말풍선 고르기', chatNote: '고른 말이 내 머리 위에 떠요. 같은 곳에 있는 사람들이 함께 봐요.',
+    chatSolo: '지금은 혼자 보기라서 나에게만 보여요', chatWait: '조금 뒤에 다시 말할 수 있어요'
   },
   look: { sky: '#CDEBF6', sea: '#8DD3EA', base: '#EDE3CC', neighbor: '#DDE5D3', neighborLine: '#B9C4AC' },
   // 지역 코드(INSEE)별 한글·프랑스어 이름과 색. label: 땅에 쓴 이름의 크기(size, 칸)와 자리 옮김(dx 동쪽+, dz 남쪽+)
@@ -150,6 +153,116 @@ window.LOBBY_CONFIG = {
   },
   // 멀티플레이: 같은 폴더 relay.json의 중계 서버 주소를 읽는다(없으면 혼자 보기). 주소 ?mp=0 끔, ?mp=ws://…/ws 시험 서버
   multiplayer: { file: 'relay.json', lobbyRoom: 'fr:lobby', roomPrefix: 'fr:', sendHz: 4 },   // sendHz: 움직일 때 초당 보내는 횟수(Cloudflare 무료 한도 때문에 낮게. 60명 예정이라 10-06 6 → 4)
+  // 말풍선 대화(2026-10-31 휴먼쌤 "채팅기능 넣어줘"): 정해진 한국어 표현만 고른다(자유 글 없음). 서버로는 번호만 가므로 순서를 바꾸지 말고 뒤에만 더한다. 독일·영국 로비와 같은 번호
+  chat: {
+    "groups": [
+      "인사",
+      "대화",
+      "마음"
+    ],
+    "phrases": [
+      {
+        "ko": "안녕하세요!",
+        "hint": "Bonjour !",
+        "g": 0
+      },
+      {
+        "ko": "반가워요!",
+        "hint": "Ravi(e) de te voir !",
+        "g": 0
+      },
+      {
+        "ko": "안녕히 가세요!",
+        "hint": "Au revoir !",
+        "g": 0
+      },
+      {
+        "ko": "또 만나요!",
+        "hint": "À bientôt !",
+        "g": 0
+      },
+      {
+        "ko": "이름이 뭐예요?",
+        "hint": "Comment tu t'appelles ?",
+        "g": 1
+      },
+      {
+        "ko": "저는 한국어를 배워요.",
+        "hint": "J'apprends le coréen.",
+        "g": 1
+      },
+      {
+        "ko": "같이 가요!",
+        "hint": "On y va ensemble !",
+        "g": 1
+      },
+      {
+        "ko": "여기로 와요!",
+        "hint": "Viens ici !",
+        "g": 1
+      },
+      {
+        "ko": "교실에 들어가 봐요!",
+        "hint": "Allons dans la classe !",
+        "g": 1
+      },
+      {
+        "ko": "잠깐만요!",
+        "hint": "Attends un peu !",
+        "g": 1
+      },
+      {
+        "ko": "도와줄까요?",
+        "hint": "Je peux t'aider ?",
+        "g": 1
+      },
+      {
+        "ko": "네!",
+        "hint": "Oui !",
+        "g": 1
+      },
+      {
+        "ko": "아니요.",
+        "hint": "Non.",
+        "g": 1
+      },
+      {
+        "ko": "고마워요!",
+        "hint": "Merci !",
+        "g": 2
+      },
+      {
+        "ko": "미안해요.",
+        "hint": "Pardon.",
+        "g": 2
+      },
+      {
+        "ko": "괜찮아요.",
+        "hint": "Ce n'est pas grave.",
+        "g": 2
+      },
+      {
+        "ko": "좋아요!",
+        "hint": "Super !",
+        "g": 2
+      },
+      {
+        "ko": "재미있어요!",
+        "hint": "C'est amusant !",
+        "g": 2
+      },
+      {
+        "ko": "대단해요!",
+        "hint": "Bravo !",
+        "g": 2
+      },
+      {
+        "ko": "축하해요!",
+        "hint": "Félicitations !",
+        "g": 2
+      }
+    ]
+  },
   // 한글학교 17곳(휴먼쌤 2026-10-06 결정: 조사한 20곳에서 숄레·디종·리옹 한글학교 3곳을 지도에서도 뺌. 10-24 리옹 에콜리움을 뺐다가 10-25 휴먼쌤 지시로 다시 넣음). 실존 확인 2026-10-06(하위 에이전트, 자료\한글학교-실존확인-20261006.md): 주프랑스 대사관 연락처 표(원문)·한국교육원 지도·
   // 스터디코리안 한글학교 정보(2026-01)에 모두 있는 곳 = 등급 ◎. 좌표는 학교 소재지(번지 수준). 연구부 '검증' 딱지는 아직 아님.
   // pending: true = 아직 확인 중(지금은 없음. 뺀 숄레가 그랬다). rooms에 같은 id가 있으면 입장할 때 그 교실로 들어간다
