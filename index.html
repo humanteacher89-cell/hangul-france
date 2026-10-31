@@ -78,8 +78,10 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--sky);color:var(-
 .namebox .me .dot::before{content:"";position:absolute;left:4px;right:4px;top:-4px;height:26px;border-radius:50% 50% 30% 30%;background:var(--c-hair)}
 /* 팝업: 책·사진첩·TV */
 .pop{z-index:12;background:rgba(30,43,74,.45);align-items:center}
-.pop .pbox{position:relative;width:min(640px,100%);max-height:calc(100vh - 32px);box-sizing:border-box;overflow:auto;border-radius:22px;box-shadow:0 18px 50px rgba(0,0,0,.3)}
-.pop .close{position:absolute;right:12px;top:12px;z-index:2}
+/* 2026-10-31: 폰에서 책을 열면 위아래가 잘렸다(휴먼쌤 10-24). 100vh는 주소창까지 센 높이라 상자가 보이는 화면보다 커져 가운데 맞춤에서 위아래가 잘렸다 → 작은 뷰포트(svh) 기준으로 높이를 잡고(모르는 브라우저는 앞 줄 vh), 닫기 단추는 상자 안을 스크롤해도 위에 붙어 있게 */
+.pop .pbox{position:relative;display:flex;flex-direction:column;width:min(640px,100%);max-height:calc(100vh - 32px);max-height:calc(100svh - 32px);box-sizing:border-box;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;border-radius:22px;box-shadow:0 18px 50px rgba(0,0,0,.3)}
+.pop .pbox>*{flex:0 0 auto}
+.pop .close{position:sticky;top:12px;align-self:flex-end;margin:12px 12px -47px 0;z-index:2}
 .book{background:var(--cream);padding:26px 22px 22px;display:grid;grid-template-columns:1fr 1fr;gap:0;min-height:300px;border:10px solid #8C6A4F;border-radius:14px}
 .book .pg{padding:18px 20px;position:relative}
 .book .pg.l{border-right:2px solid rgba(140,106,79,.35);box-shadow:inset -18px 0 24px -20px rgba(0,0,0,.25)}
@@ -115,7 +117,7 @@ html,body{height:100%;margin:0;overflow:hidden;background:var(--sky);color:var(-
 .tvbox .note{color:rgba(255,255,255,.7);text-align:center;margin-top:12px}
 .tvbox .stand{width:38%;height:10px;margin:10px auto 0;background:#2E2E36;border-radius:0 0 10px 10px}
 /* 대화·회화 연습 */
-.talk{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);transform:translateX(-50%);width:min(520px,calc(100vw - 24px));box-sizing:border-box;background:var(--paper);border-radius:22px;padding:16px 18px 16px;box-shadow:0 12px 36px rgba(30,43,74,.26);z-index:11;max-height:calc(100vh - 110px);overflow:auto}
+.talk{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);transform:translateX(-50%);width:min(520px,calc(100vw - 24px));box-sizing:border-box;background:var(--paper);border-radius:22px;padding:16px 18px 16px;box-shadow:0 12px 36px rgba(30,43,74,.26);z-index:11;max-height:calc(100vh - 110px);max-height:calc(100svh - 110px);overflow:auto}
 .talk .hd{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .talk .who{font-size:12.5px;font-weight:700;color:var(--blue);background:var(--soft);border-radius:999px;padding:4px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .talk .prog{font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
