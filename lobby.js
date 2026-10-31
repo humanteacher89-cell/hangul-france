@@ -1123,7 +1123,7 @@
     $('btnBack').addEventListener('click', () => { $('enter').hidden = true; });
     $('btnLobby').addEventListener('click', () => { if (ROOM) ROOM.closePop(); leaveRoom(); });
     $('btnProfile').addEventListener('click', () => { $('list').hidden = true; profileUI(); });
-    // 유럽 입구로 가는 단추(2026-10-31): 설정에 europeUrl이 있는 나라만(지금은 독일·영국. 프랑스는 공개 승인 뒤)
+    // 유럽 입구로 가는 단추(2026-10-31): 설정에 europeUrl이 있는 나라만(독일·영국, 프랑스는 10-31 공개 때 넣음)
     if (C.europeUrl) {
       const a = document.createElement('a');
       a.className = 'pill'; a.href = C.europeUrl; a.textContent = T.europe || '유럽 지도로'; a.style.textDecoration = 'none';
