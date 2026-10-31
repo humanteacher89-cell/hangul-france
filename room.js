@@ -1,4 +1,5 @@
-// 프랑스 한글학교 로비 — 학교 공간(교실) v0.1 (2026-10-06, XR개발부)
+// 한글학교 로비 — 학교 공간(교실) v0.2 (2026-10-06 프랑스, 2026-10-31 독일·영국도 함께 씀, XR개발부)
+// 나라마다 다른 것: config.flag(칠판 오른쪽 국기 fr·de·gb), config.countryFoot(포스터 아랫글 기본값), 포스터 그림 gate·bigben·bus(독일·영국용)
 // 로비 엔진(lobby.js)이 core를 넘겨 주면 교실 세계를 만든다. 내용(교장 인사·퀴즈·책·사진첩·TV)은 lobby.config.js의 rooms[학교 id].
 // 10-24부터 교장 선생님은 회화 연습 대신 학교 퀴즈를 낸다(관리자 페이지 '교장 선생님 퀴즈', 없으면 기본 퀴즈). rooms[].situations(회화)는 남겨 두었지만 쓰지 않는다.
 // 교실 = 북쪽 벽(칠판)·서쪽 벽(창문)·동쪽 벽(포스터), 책상 9개, 정면 교장 NPC, 책·사진첩·TV·게시판 구역. 모든 글은 HTML 팝업으로 보여 준다.
@@ -7,6 +8,7 @@ window.LOBBY_ROOM = function (core) {
   const { THREE, LAND_Y, FONT_D, FONT_B, $, fill, clamp, canvasTex, colored, merge, pill, fitFont, signSprite, addChar, removeChar,
     showCard, hideCard, showToast, T, IS_TOUCH, setPaused } = core;
   const Y = LAND_Y;
+  const CFG = window.LOBBY_CONFIG || {}, FLAG = CFG.flag || 'fr', FOOT = CFG.countryFoot || 'France';
   const W = 18, D = 13;                 // 교실 가로·세로(칸). 캐릭터 키는 약 1.6칸
   const HALF_W = W / 2, HALF_D = D / 2;
   const WALL_H = 3.2;
@@ -153,6 +155,20 @@ window.LOBBY_ROOM = function (core) {
         g.beginPath(); g.ellipse(124, 270, 30, 40, -0.3, 0, Math.PI * 2); g.fillStyle = '#4A5874'; g.fill();
         g.strokeStyle = c; g.lineWidth = 18; g.lineCap = 'round'; g.beginPath(); g.moveTo(74, 300); g.quadraticCurveTo(52, 360, 76, 400); g.stroke(); g.lineCap = 'butt';
         [130, 170, 230, 270].forEach(x => R(x - 12, 340, 26, 80)); O(98, 270, 5, BG); break;
+      case 'gate':   // 브란덴부르크 문(2026-10-31)
+        R(60, 410, 264, 16); for (let i = 0; i < 6; i++) R(80 + i * 44, 300, 16, 110);
+        R(66, 274, 252, 28); R(108, 246, 168, 30); R(150, 224, 84, 22);
+        O(192, 210, 9); P([172, 212, 212, 212, 192, 192]); break;
+      case 'bigben':   // 엘리자베스 타워(빅벤, 2026-10-31)
+        R(140, 410, 104, 20); R(168, 246, 48, 166); R(160, 198, 64, 50); O(192, 223, 18, BG); O(192, 223, 3);
+        g.strokeStyle = c; g.lineWidth = 3; g.beginPath(); g.moveTo(192, 223); g.lineTo(192, 210); g.moveTo(192, 223); g.lineTo(201, 228); g.stroke();
+        R(166, 170, 52, 30); R(176, 178, 12, 16, BG); R(196, 178, 12, 16, BG); P([160, 172, 224, 172, 192, 106]); R(190, 92, 4, 16);
+        for (let y = 270; y < 410; y += 34) R(174, y, 36, 4, BG); break;
+      case 'bus':   // 런던 2층 버스(2026-10-31)
+        R(66, 250, 252, 150); R(66, 312, 252, 6, BG);
+        for (let i = 0; i < 5; i++) R(80 + i * 47, 264, 36, 36, BG);
+        R(80, 326, 30, 62, BG); for (let i = 1; i < 5; i++) R(80 + i * 47, 326, 36, 30, BG);
+        [[118, 404], [272, 404]].forEach(([x, y]) => { O(x, y, 24, '#1E2B4A'); O(x, y, 9, BG); }); break;
       default:
         O(192, 290, 80);
     }
@@ -173,12 +189,29 @@ window.LOBBY_ROOM = function (core) {
       g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#1E2B4A';
       fitFont(g, p.title, 'normal', 56, FONT_D, w - 40); g.fillText(p.title, w / 2, 70);
       g.fillStyle = '#4A5874'; fitFont(g, p.sub, '700', 24, FONT_B, w - 40); g.fillText(p.sub, w / 2, 120);
-      g.fillStyle = '#4A5874'; fitFont(g, p.foot || 'France', '700', 22, FONT_B, w - 40); g.fillText(p.foot || 'France', w / 2, 460);
+      g.fillStyle = '#4A5874'; fitFont(g, p.foot || FOOT, '700', 22, FONT_B, w - 40); g.fillText(p.foot || FOOT, w / 2, 460);
     });
   }
   function flagTex(kind) {
     return canvasTex(192, 128, (g, w, h) => {
       if (kind === 'fr') { ['#2A4D9B', '#FFFFFF', '#E0483E'].forEach((c, i) => { g.fillStyle = c; g.fillRect(i * w / 3, 0, w / 3 + 1, h); }); }
+      else if (kind === 'de') { ['#1E1E1E', '#DD0000', '#FFCE00'].forEach((c, i) => { g.fillStyle = c; g.fillRect(0, i * h / 3, w, h / 3 + 1); }); }
+      else if (kind === 'gb') {
+        // 영국 국기: 60×30 판(위키백과 표준 그림과 같은 짜임)을 칸에 맞춰 늘려 그린다. 붉은 대각선은 칸마다 한쪽으로 비켜 있다
+        g.save(); g.scale(w / 60, h / 30);
+        g.fillStyle = '#012169'; g.fillRect(0, 0, 60, 30);
+        const diag = () => { g.beginPath(); g.moveTo(0, 0); g.lineTo(60, 30); g.moveTo(60, 0); g.lineTo(0, 30); g.stroke(); };
+        g.strokeStyle = '#FFFFFF'; g.lineWidth = 6; diag();
+        g.save(); g.beginPath();
+        g.moveTo(30, 15); g.lineTo(60, 15); g.lineTo(60, 30); g.closePath();
+        g.moveTo(30, 15); g.lineTo(30, 30); g.lineTo(0, 30); g.closePath();
+        g.moveTo(30, 15); g.lineTo(0, 15); g.lineTo(0, 0); g.closePath();
+        g.moveTo(30, 15); g.lineTo(30, 0); g.lineTo(60, 0); g.closePath();
+        g.clip(); g.strokeStyle = '#C8102E'; g.lineWidth = 4; diag(); g.restore();
+        g.fillStyle = '#FFFFFF'; g.fillRect(25, 0, 10, 30); g.fillRect(0, 10, 60, 10);
+        g.fillStyle = '#C8102E'; g.fillRect(27, 0, 6, 30); g.fillRect(0, 12, 60, 6);
+        g.restore();
+      }
       else {
         g.fillStyle = '#FFFFFF'; g.fillRect(0, 0, w, h);
         g.fillStyle = '#E0483E'; g.fillRect(0, 0, w, 12); g.fillStyle = '#2A4D9B'; g.fillRect(0, h - 12, w, 12);
@@ -314,7 +347,7 @@ window.LOBBY_ROOM = function (core) {
     box(7.7, 2.6, 0.08, '#8C6A4F', 0, Y + 1.95, -HALF_D - 0.03, scene);
     const flagK = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.73), new THREE.MeshBasicMaterial({ map: flagTex('kr') }));
     flagK.position.set(-5.6, Y + 2.5, -HALF_D + 0.02); scene.add(flagK);
-    const flagF = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.73), new THREE.MeshBasicMaterial({ map: flagTex('fr') }));
+    const flagF = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.73), new THREE.MeshBasicMaterial({ map: flagTex(FLAG) }));
     flagF.position.set(5.6, Y + 2.5, -HALF_D + 0.02); scene.add(flagF);
 
     // 서쪽 창문 둘(창밖은 지역 풍경)

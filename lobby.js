@@ -1,10 +1,11 @@
-// 프랑스 한글학교 로비 엔진 v0.2 (three.js r147 UMD, 전역 THREE)
-// 글·학교·지역 색·교실 내용: lobby.config.js / 지도 좌표: france-map.js(tools/make_map.py가 만듦) / 교실: room.js
-// 멀티플레이: 같은 폴더 relay.json의 온라인 중계 서버(relay/server.js)에 붙는다. 로비 방 'fr:lobby', 교실 방 'fr:<학교 id>'.
+// 한글학교 로비 엔진 v0.3 (three.js r147 UMD, 전역 THREE). 프랑스 로비(저장소 루트)와 독일 로비(de/)·영국 로비(uk/)가 함께 쓴다(2026-10-31 유럽 확장).
+// 글·학교·지역 색·교실 내용: 나라 폴더의 lobby.config.js / 지도 좌표: france-map.js(window.FRANCE_MAP)·de/germany-map.js·uk/uk-map.js(window.LOBBY_MAP), 모두 tools/make_map.py가 만듦 / 교실: room.js
+// 멀티플레이: config.multiplayer.file(relay.json)의 온라인 중계 서버에 붙는다. 방 이름은 config.multiplayer(프랑스 'fr:lobby'·'fr:<학교 id>', 독일 'de:', 영국 'uk:').
+// 나라마다 다른 것은 모두 config에: contentMap(관리자 내용 영역 fr·de·uk), regions[].local(땅에 쓰는 현지어 이름, 프랑스는 옛 이름 fr), landmarks[].kind(eiffel·gate·bigben), flag, countryFoot.
 // 시험 주소: ?bots=50 가짜 참가자 50명(#bots50도 됨), ?test=1(#test) 학교 목록에 '시험용 참가자' 버튼, ?fps=1 초당 화면 수, ?mp=0 접속 끔, ?mp=ws://127.0.0.1:8787/ws 시험 서버, ?room=이름 다른 방
 (function () {
   'use strict';
-  const C = window.LOBBY_CONFIG, M = window.FRANCE_MAP, T = C.text;
+  const C = window.LOBBY_CONFIG, M = window.LOBBY_MAP || window.FRANCE_MAP, T = C.text;
   const Q = new URLSearchParams(location.search);
   const HASH = (location.hash || '').slice(1);   // 아티팩트 링크에는 #bots50 같은 짧은 표시만 전달된다
   const BOTS = parseInt(Q.get('bots') || (HASH.match(/bots(\d+)/) || [])[1] || '0', 10) || 0;
@@ -13,7 +14,7 @@
   const ROOM_SUFFIX = String(Q.get('room') || '').replace(/[^\w가-힣-]/g, '').slice(0, 20);
   const IS_TOUCH = matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints > 0 && !matchMedia('(pointer: fine)').matches);
   const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const LAND_Y = 0.6;                       // 프랑스 땅 윗면 높이
+  const LAND_Y = 0.6;                       // 나라 땅 윗면 높이
   const SPEED = 6;                          // 걷는 속도(칸/초). 1칸은 약 9km
   const SCALE = 0.82;                       // 캐릭터 크기(키 약 1.6칸)
   const MAX_CHARS = 80; /* 동시접속 60명 예정(10-06 휴먼쌤) + NPC·여유 */                    // 한 번에 그릴 수 있는 최대 인원
@@ -38,10 +39,12 @@
   // ── 지도 좌표: 경도·위도 → 칸(x 동쪽 +, z 남쪽 +) ──
   const toXZ = (lon, lat) => [(lon - M.lon0) * M.k * M.s, -(lat - M.lat0) * M.s];
   const ringOf = f => { const a = []; for (let i = 0; i < f.length; i += 2) a.push([f[i], f[i + 1]]); return a; };
+  // h = 고리마다의 구멍(다른 지역이 안에 들어 있는 곳: 브란덴부르크 안의 베를린 등). 프랑스 지도에는 없다
   const REG = M.regions.map((g, i) => ({
-    idx: i + 1, code: g.c, rings: g.r.map(ringOf), lx: g.l[0], lz: g.l[1],
+    idx: i + 1, code: g.c, rings: g.r.map(ringOf), holes: (g.h || []).map(hs => hs.map(ringOf)), lx: g.l[0], lz: g.l[1],
     info: C.regions[g.c] || { ko: g.n, fr: g.n, color: '#dddddd' }
   }));
+  const localName = info => (info.local != null ? info.local : info.fr) || '';
 
   // ── 땅 판정 격자(0.25칸): 칸마다 지역 번호, 0은 바다·이웃 나라 ──
   const CELL = 0.25;
@@ -51,15 +54,16 @@
   }
   gx0 -= 1; gz0 -= 1; gx1 += 1; gz1 += 1;
   const GW = Math.ceil((gx1 - gx0) / CELL), GH = Math.ceil((gz1 - gz0) / CELL), GRID = new Uint8Array(GW * GH);
-  for (const g of REG) for (const r of g.rings) {
+  for (const g of REG) g.rings.forEach((r, ri) => {
     let rz0 = 1e9, rz1 = -1e9;
     for (const p of r) { if (p[1] < rz0) rz0 = p[1]; if (p[1] > rz1) rz1 = p[1]; }
     const j0 = Math.max(0, Math.floor((rz0 - gz0) / CELL)), j1 = Math.min(GH - 1, Math.ceil((rz1 - gz0) / CELL));
+    const edges = [r].concat(g.holes[ri] || []);   // 구멍의 변도 함께 세면 구멍 안은 이 지역이 아니다(짝홀 규칙)
     for (let j = j0; j <= j1; j++) {
       const z = gz0 + (j + 0.5) * CELL, xs = [];
-      for (let i = 0, k = r.length - 1; i < r.length; k = i++) {
-        const za = r[k][1], zb = r[i][1];
-        if ((za > z) !== (zb > z)) xs.push(r[k][0] + (z - za) / (zb - za) * (r[i][0] - r[k][0]));
+      for (const e of edges) for (let i = 0, k = e.length - 1; i < e.length; k = i++) {
+        const za = e[k][1], zb = e[i][1];
+        if ((za > z) !== (zb > z)) xs.push(e[k][0] + (z - za) / (zb - za) * (e[i][0] - e[k][0]));
       }
       if (xs.length < 2) continue;
       xs.sort((a, b) => a - b);
@@ -69,7 +73,7 @@
         for (let i = i0; i <= i1; i++) GRID[j * GW + i] = g.idx;
       }
     }
-  }
+  });
   function regionAt(x, z) {
     const i = Math.floor((x - gx0) / CELL), j = Math.floor((z - gz0) / CELL);
     if (i < 0 || j < 0 || i >= GW || j >= GH) return null;
@@ -155,8 +159,13 @@
     r.forEach(([x, z], i) => (i ? s.lineTo(x, -z) : s.moveTo(x, -z)));
     return s;
   }
-  function slab(rings, depth, top, side) {
-    const geo = new THREE.ExtrudeGeometry(rings.map(shapeOf), { depth, bevelEnabled: false, curveSegments: 1 });
+  function slab(rings, depth, top, side, holes) {
+    const shapes = rings.map((r, i) => {
+      const s = shapeOf(r);
+      for (const h of (holes && holes[i]) || []) { const p = new THREE.Path(); h.forEach(([x, z], k) => (k ? p.lineTo(x, -z) : p.moveTo(x, -z))); s.holes.push(p); }
+      return s;
+    });
+    const geo = new THREE.ExtrudeGeometry(shapes, { depth, bevelEnabled: false, curveSegments: 1 });
     geo.rotateX(-Math.PI / 2);
     const mesh = new THREE.Mesh(geo, [
       new THREE.MeshLambertMaterial({ color: top }),
@@ -216,7 +225,7 @@
   const _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _p = new THREE.Vector3(), _c = new THREE.Color();
   const Y_AXIS = new THREE.Vector3(0, 1, 0);
 
-  // ── 바다·이웃 나라·프랑스 땅 ──
+  // ── 바다·이웃 나라·나라 땅 ──
   let seaTex;
   function buildMap() {
     seaTex = canvasTex(256, 256, (g) => {
@@ -237,7 +246,7 @@
     nbRings.forEach(r => slab([r], 0.3, C.look.neighbor));
     ribbons(nbRings, 0.12, C.look.neighborLine, 0.9, 0.31);
     slab(M.base.map(ringOf), LAND_Y - 0.1, C.look.base);
-    for (const g of REG) slab(g.rings, LAND_Y, g.info.color);
+    for (const g of REG) slab(g.rings, LAND_Y, g.info.color, null, g.holes);
     ribbons(REG.flatMap(g => g.rings), 0.16, '#FFFFFF', 0.92, LAND_Y + 0.012);
   }
 
@@ -266,7 +275,7 @@
     for (const g of REG) {
       const L = g.info.label || {}, size = L.size || 11;
       const x = g.lx + (L.dx || 0), z = g.lz + (L.dz || 0);
-        const mesh = groundLabel(g.info.ko, g.info.fr, x, z, size);
+        const mesh = groundLabel(g.info.ko, localName(g.info), x, z, size);
       LABELS.push({ x, z, hw: size / 2, hd: size * 0.16, mesh });
     }
   }
@@ -336,7 +345,7 @@
     SIGNS.push(sign);
   }
 
-  // ── 에펠탑(파리 표시) ──
+  // ── 명소(에펠탑·브란덴부르크 문·엘리자베스 타워) ──
   function beam(a, b, r) {
     const va = new THREE.Vector3(a[0], a[1], a[2]), vb = new THREE.Vector3(b[0], b[1], b[2]);
     const g = new THREE.CylinderGeometry(r * 0.75, r, va.distanceTo(vb), 4);
@@ -344,11 +353,9 @@
     const mid = va.add(vb).multiplyScalar(0.5);
     return g.translate(mid.x, mid.y, mid.z);
   }
-  const LANDMARKS = [];
-  function buildLandmarks() {
-    for (const L of C.landmarks || []) {
-      if (L.id !== 'eiffel') continue;
-      const [x, z] = toXZ(L.lon, L.lat);
+  // 명소 종류(config.landmarks[].kind, 없으면 id). geo = 한 덩어리 모양, coll = 부딪힘 원(가운데에서 dx·dz), r = 학교 무리가 비켜 서는 거리
+  const LANDMARK_KINDS = {
+    eiffel() {   // 에펠탑(파리, 프랑스 로비) — 2026-10-06 모양 그대로
       const parts = [];
       for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
         parts.push(beam([sx * 1.05, 0, sz * 1.05], [sx * 0.42, 1.72, sz * 0.42], 0.17));
@@ -361,12 +368,64 @@
       const arch = () => new THREE.TorusGeometry(0.6, 0.07, 4, 12, Math.PI);
       parts.push(arch().translate(0, 0.82, 0.74), arch().translate(0, 0.82, -0.74),
         arch().rotateY(Math.PI / 2).translate(0.74, 0.82, 0), arch().rotateY(Math.PI / 2).translate(-0.74, 0.82, 0));
-      const geo = merge(parts.map(p => colored(p, '#8C6A4F')));
-      const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+      return { geo: merge(parts.map(p => colored(p, '#8C6A4F'))), coll: [{ dx: 0, dz: 0, r: 1.25 }], r: 3.4 };
+    },
+    gate() {   // 브란덴부르크 문(베를린, 독일 로비, 2026-10-31): 기둥 12개·통로 벽·지붕·마차상(녹색 구리)
+      const stone = '#E6D6AE', col = '#EFE3C4', dark = '#CDBA8C', green = '#5E9483', P = [];
+      P.push(colored(new THREE.BoxGeometry(4.7, 0.14, 1.6).translate(0, 0.07, 0), dark));
+      for (const x of [-1.75, -1.05, -0.35, 0.35, 1.05, 1.75]) {
+        for (const z of [-0.48, 0.48]) P.push(colored(new THREE.CylinderGeometry(0.12, 0.14, 1.5, 8).translate(x, 0.89, z), col));
+        P.push(colored(new THREE.BoxGeometry(0.16, 1.5, 0.82).translate(x, 0.89, 0), stone));
+      }
+      P.push(colored(new THREE.BoxGeometry(4.5, 0.34, 1.34).translate(0, 1.81, 0), stone));
+      P.push(colored(new THREE.BoxGeometry(4.6, 0.06, 1.42).translate(0, 1.66, 0), dark));
+      P.push(colored(new THREE.BoxGeometry(3.9, 0.16, 1.16).translate(0, 2.06, 0), stone));
+      P.push(colored(new THREE.BoxGeometry(1.9, 0.34, 0.92).translate(0, 2.31, 0), stone));
+      P.push(colored(new THREE.BoxGeometry(0.56, 0.2, 0.3).translate(0, 2.58, -0.12), green));
+      for (const x of [-0.33, -0.11, 0.11, 0.33]) {
+        P.push(colored(new THREE.BoxGeometry(0.12, 0.17, 0.42).translate(x, 2.62, 0.16), green));
+        P.push(colored(new THREE.BoxGeometry(0.1, 0.18, 0.1).translate(x, 2.78, 0.33), green));
+      }
+      P.push(colored(new THREE.CylinderGeometry(0.05, 0.08, 0.5, 6).translate(0, 2.92, -0.12), green));
+      P.push(colored(new THREE.BoxGeometry(0.42, 0.18, 0.04).translate(0, 3.08, -0.14), green));
+      return { geo: merge(P), coll: [{ dx: -1.45, dz: 0, r: 0.95 }, { dx: 0, dz: 0, r: 0.95 }, { dx: 1.45, dz: 0, r: 0.95 }], r: 3.3 };
+    },
+    bigben() {   // 엘리자베스 타워(빅벤, 런던, 영국 로비, 2026-10-31): 네모 탑·네 면 시계·종루·뾰족 지붕
+      const stone = '#D6BA82', light = '#E2C996', dark = '#B39461', roof = '#4F6F74', gold = '#C9A227', P = [];
+      P.push(colored(new THREE.BoxGeometry(1.1, 0.3, 1.1).translate(0, 0.15, 0), dark));
+      P.push(colored(new THREE.BoxGeometry(0.8, 3.3, 0.8).translate(0, 1.95, 0), stone));
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) P.push(colored(new THREE.BoxGeometry(0.12, 3.3, 0.12).translate(sx * 0.41, 1.95, sz * 0.41), light));
+      for (let y = 0.9; y < 3.5; y += 0.65) P.push(colored(new THREE.BoxGeometry(0.86, 0.05, 0.86).translate(0, y, 0), dark));
+      P.push(colored(new THREE.BoxGeometry(1.0, 0.92, 1.0).translate(0, 4.06, 0), light));
+      for (let k = 0; k < 4; k++) {
+        const a = k * Math.PI / 2, ox = Math.sin(a), oz = Math.cos(a);
+        const face = new THREE.CylinderGeometry(0.36, 0.36, 0.04, 20).rotateX(Math.PI / 2).rotateY(a).translate(ox * 0.51, 4.06, oz * 0.51);
+        const ring = new THREE.TorusGeometry(0.36, 0.035, 4, 20).rotateY(a).translate(ox * 0.53, 4.06, oz * 0.53);
+        const hand1 = new THREE.BoxGeometry(0.035, 0.26, 0.02).translate(0, 0.11, 0).rotateY(a).translate(ox * 0.545, 4.06, oz * 0.545);
+        const hand2 = new THREE.BoxGeometry(0.035, 0.18, 0.02).translate(0, 0.08, 0).rotateZ(-Math.PI / 2.4).rotateY(a).translate(ox * 0.545, 4.06, oz * 0.545);
+        P.push(colored(face, '#FBF4E2'), colored(ring, '#3A3226'), colored(hand1, '#2B2B2F'), colored(hand2, '#2B2B2F'));
+        P.push(colored(new THREE.BoxGeometry(0.46, 0.32, 0.03).rotateY(a).translate(ox * 0.44, 4.78, oz * 0.44), '#4A3C2A'));
+      }
+      P.push(colored(new THREE.BoxGeometry(0.86, 0.58, 0.86).translate(0, 4.81, 0), stone));
+      P.push(colored(new THREE.ConeGeometry(0.66, 1.15, 4).rotateY(Math.PI / 4).translate(0, 5.67, 0), roof));
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) P.push(colored(new THREE.ConeGeometry(0.07, 0.42, 4).translate(sx * 0.4, 5.31, sz * 0.4), roof));
+      P.push(colored(new THREE.CylinderGeometry(0.015, 0.04, 0.5, 4).translate(0, 6.48, 0), gold));
+      return { geo: merge(P), coll: [{ dx: 0, dz: 0, r: 0.8 }], r: 2.6 };
+    }
+  };
+  const LANDMARKS = [];
+  function buildLandmarks() {
+    for (const L of C.landmarks || []) {
+      const make = LANDMARK_KINDS[L.kind || L.id];
+      if (!make) continue;
+      const [x, z] = toXZ(L.lon, L.lat);
+      const lm = make(), k = L.scale || 1;   // scale: 작은 지역(베를린) 안에 들게 줄일 때
+      const mesh = new THREE.Mesh(lm.geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
       mesh.position.set(x, LAND_Y, z);
+      if (k !== 1) mesh.scale.setScalar(k);
       scene.add(mesh);
-      COLL.push({ x, z, r: 1.25 });
-      LANDMARKS.push({ x, z, r: 3.4 });
+      for (const c of lm.coll) COLL.push({ x: x + c.dx * k, z: z + c.dz * k, r: c.r * k });
+      LANDMARKS.push({ x, z, r: lm.r * k });
     }
   }
 
@@ -709,7 +768,7 @@
   const OV = {};
   const tanV = () => Math.tan(THREE.MathUtils.degToRad(VFOV / 2));
   function baseD() { return clamp(17 / (2 * tanV() * camera.aspect), 26, 72); }
-  // 전체 지도: 기울어진 카메라로 보이는 땅의 앞뒤 길이를 계산해 프랑스가 꼭 들어오게 한다
+  // 전체 지도: 기울어진 카메라로 보이는 땅의 앞뒤 길이를 계산해 나라 전체가 꼭 들어오게 한다
   const OVP = 1.2;
   function overBand() {
     const a = THREE.MathUtils.degToRad(VFOV / 2), s = Math.sin(OVP), c = Math.cos(OVP);
@@ -910,7 +969,7 @@
   function openEnter(s) {
     if (C.rooms && C.rooms[s.id]) { enterRoom(s); return; }
     $('enterName').textContent = s.name;
-    $('enterSub').textContent = [s.nameFr, s.city, s.regionName].filter(Boolean).join(' · ');
+    $('enterSub').textContent = [s.nameLocal || s.nameFr, s.city, s.regionName].filter(Boolean).join(' · ');
     $('enterBody').textContent = fill(T.enterBody, s);
     $('enter').hidden = false;
     $('btnBack').focus();
@@ -1034,6 +1093,12 @@
     $('btnBack').addEventListener('click', () => { $('enter').hidden = true; });
     $('btnLobby').addEventListener('click', () => { if (ROOM) ROOM.closePop(); leaveRoom(); });
     $('btnProfile').addEventListener('click', () => { $('list').hidden = true; profileUI(); });
+    // 유럽 입구로 가는 단추(2026-10-31): 설정에 europeUrl이 있는 나라만(지금은 독일·영국. 프랑스는 공개 승인 뒤)
+    if (C.europeUrl) {
+      const a = document.createElement('a');
+      a.className = 'pill'; a.href = C.europeUrl; a.textContent = T.europe || '유럽 지도로'; a.style.textDecoration = 'none';
+      $('btnProfile').parentNode.insertBefore(a, $('btnProfile'));
+    }
     buildList();
     setTimeout(() => { $('hint').style.opacity = 0; }, 7000);
     if (SHOW_STAT) $('stat').hidden = false;
@@ -1136,7 +1201,7 @@
       const rg = regionAt(ME.x, ME.z);
       if (rg && rg !== LAST_REGION) {
         LAST_REGION = rg;
-        showToast(`${rg.info.ko}<small>${rg.info.fr}</small>`);
+        showToast(`${rg.info.ko}<small>${localName(rg.info)}</small>`);
         $('region').textContent = rg.info.ko;
       }
       // 입장 발판
@@ -1379,7 +1444,7 @@
       CONTENT.api = api;
       const ctl = typeof AbortController === 'function' ? new AbortController() : null;
       const tm = setTimeout(() => { if (ctl) ctl.abort(); }, 6000);
-      fetch(api + '/api/content?map=fr', { cache: 'no-store', signal: ctl ? ctl.signal : undefined })
+      fetch(api + '/api/content?map=' + encodeURIComponent(C.contentMap || 'fr'), { cache: 'no-store', signal: ctl ? ctl.signal : undefined })
         .then(r => (r.ok ? r.json() : null)).then(j => { clearTimeout(tm); if (j) applyContent(j); }).catch(() => clearTimeout(tm));
     };
     const q = Q.get('api');

@@ -5,6 +5,7 @@
 // 2026-10-12: Durable Objects는 요청 수 말고 실행 시간(duration) 한도도 있다 — 타이머를 계속 돌리면 객체가 잠들지 못해 한도를 넘는다.
 //   그래서 중계 타이머는 바뀐 상태가 있을 때만 한 번 걸고, ping은 자동 응답(깨우지 않음), 말 없는 소켓은 알람으로 정리한다.
 // 2026-10-06: /api/* = 관리자 페이지용 내용 저장소(src/content.js, Durable Object 'Content' 하나에 학교 링크·교실 글·사진·계정).
+// 2026-10-31: 독일 로비('de:lobby'·'de:<학교 id>')·영국 로비('uk:lobby'·'uk:<학교 id>')도 같은 서버. 방은 이름만 다르면 따로 돈다.
 'use strict';
 import { handleApi, Content } from './content.js';
 export { Content };

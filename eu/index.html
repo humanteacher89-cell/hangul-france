@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<title>유럽 한글학교 메타버스</title>
+<meta name="description" content="프랑스·독일·영국 한글학교 로비로 들어가는 유럽 입구">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
+<style>
+/* 유럽 한글학교 메타버스 입구 (2026-10-31, XR개발부 — A안). 유럽 지도에서 나라를 고르면 그 나라 한글학교 로비로 간다.
+   지도 좌표: europe-map.js(tools/make_map.py eu, Natural Earth) / 나라·학교 점·글: eu.config.js(유럽로비\tools\make_country_config.py가 만듦).
+   로비와 같은 한낮의 지도 색(하늘·바다·연한 땅)에 고를 수 있는 세 나라만 진한 색. 나라를 더할 때는 eu.config.js에 한 줄. */
+:root{
+  --ink:#1E2B4A; --ink-2:#4A5874; --paper:#FFFFFF; --glass:rgba(255,255,255,.92); --soft:#F1F5FB;
+  --sky:#CDEBF6; --sea:#A9DCEE; --land:#E7EDE0; --land-line:#C2CDB6; --blue:#2A4D9B; --red:#E0483E;
+  --font-display:'Jua','Noto Sans KR',system-ui,sans-serif;
+  --font-body:'Noto Sans KR',system-ui,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  --shadow:0 6px 18px rgba(30,43,74,.16);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--sky);color:var(--ink);font-family:var(--font-body);-webkit-tap-highlight-color:transparent}
+body{padding:calc(env(safe-area-inset-top,0px) + 14px) 16px calc(env(safe-area-inset-bottom,0px) + 20px)}
+.wrap{max-width:1180px;margin:0 auto}
+header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+.chip{background:var(--glass);border-radius:18px;padding:10px 16px 11px;box-shadow:var(--shadow);min-width:0}
+h1{margin:0;font-family:var(--font-display);font-weight:400;font-size:22px;line-height:1.25;letter-spacing:.2px}
+.chip p{margin:3px 0 0;font-size:13px;color:var(--ink-2);line-height:1.45}
+.credit{font-size:10.5px;opacity:.55;margin-top:4px!important}
+.grid{display:grid;grid-template-columns:1fr;gap:14px}
+@media (min-width:900px){.grid{grid-template-columns:minmax(0,1.55fr) minmax(300px,1fr);align-items:start}}
+.mapbox{position:relative;background:var(--sea);border-radius:22px;overflow:hidden;box-shadow:var(--shadow)}
+.mapbox svg{display:block;width:100%;height:auto;touch-action:manipulation}
+.land{fill:var(--land);stroke:var(--land-line);stroke-width:.18;stroke-linejoin:round}
+.pick{stroke:#FFFFFF;stroke-width:.35;stroke-linejoin:round;cursor:pointer;transition:filter .2s}
+.pick:hover,.pick.on{filter:brightness(1.06) saturate(1.15)}
+.dot{fill:var(--ink);stroke:#FFFFFF;stroke-width:.16;pointer-events:none}
+.lbl{font-family:var(--font-display);font-size:2.6px;fill:var(--ink);paint-order:stroke;stroke:#FFFFFF;stroke-width:.7;stroke-linejoin:round;text-anchor:middle;pointer-events:none}
+.lbl .n{font-family:var(--font-body);font-weight:700;font-size:1.55px;fill:var(--ink-2)}
+.cards{display:flex;flex-direction:column;gap:10px}
+.card{display:flex;align-items:center;gap:14px;background:var(--paper);border-radius:20px;padding:14px 16px;box-shadow:var(--shadow);text-decoration:none;color:var(--ink);border:3px solid transparent;transition:transform .15s,border-color .15s}
+.card:hover,.card.on{transform:translateY(-2px);border-color:var(--c)}
+.card:focus-visible{outline:3px solid var(--red);outline-offset:2px}
+.sw{flex:0 0 auto;width:46px;height:46px;border-radius:14px;background:var(--c);display:grid;place-items:center;font-family:var(--font-display);font-size:18px;color:var(--ink)}
+.card .t{flex:1;min-width:0}
+.card .nm{display:block;font-family:var(--font-display);font-size:21px;line-height:1.2}
+.card .sub{display:block;font-size:12.5px;color:var(--ink-2);margin-top:3px}
+.card .cnt{white-space:nowrap}
+.card .tag{display:inline-block;font-size:11px;font-weight:700;color:var(--red);border:1px solid currentColor;border-radius:999px;padding:0 7px;margin-right:6px;line-height:17px}
+.go{flex:0 0 auto;border-radius:999px;padding:9px 14px;font:700 13.5px/1 var(--font-body);background:var(--blue);color:#fff;white-space:nowrap}
+.note{margin:4px 4px 0;font-size:12px;line-height:1.6;color:var(--ink-2)}
+.loading{padding:40px 16px;text-align:center;font-family:var(--font-display);font-size:18px}
+@media (prefers-reduced-motion:reduce){.card,.pick{transition:none}.card:hover,.card.on{transform:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><div class="chip"><h1 id="title">유럽 한글학교 메타버스</h1><p id="sub"></p><p class="credit">제작·운영 휴먼쌤</p></div></header>
+  <div class="grid">
+    <div class="mapbox"><svg id="map" role="img" aria-labelledby="mapTitle"><title id="mapTitle">유럽 지도</title></svg></div>
+    <div><nav id="cards" class="cards" aria-label="나라 고르기"><div class="loading">지도를 펼치는 중</div></nav><p id="note" class="note"></p></div>
+  </div>
+</div>
+<script src="europe-map.js" charset="utf-8"></script>
+<script src="eu.config.js" charset="utf-8"></script>
+<script>
+(function () {
+  'use strict';
+  const M = window.EUROPE_MAP, C = window.EU_CONFIG;
+  const $ = id => document.getElementById(id);
+  const NS = 'http://www.w3.org/2000/svg';
+  if (!M || !C) { $('cards').textContent = '지도를 불러오지 못했어요. 새로 고침해 주세요.'; return; }
+  const toXZ = (lon, lat) => [(lon - M.lon0) * M.k * M.s, -(lat - M.lat0) * M.s];
+  const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const pathOf = rings => rings.map(r => { let d = ''; for (let i = 0; i < r.length; i += 2) d += (i ? 'L' : 'M') + r[i] + ' ' + r[i + 1]; return d + 'Z'; }).join('');
+
+  document.title = C.title;
+  $('title').textContent = C.title;
+  $('sub').textContent = C.sub || '';
+  $('note').textContent = C.note || '';
+
+  // 보이는 범위(경도·위도) → viewBox. 폰(좁은 화면)은 고를 수 있는 나라 쪽으로 좁혀 크게 보인다
+  const svg = $('map');
+  const narrow = matchMedia('(max-width: 599px)');
+  function setView() {
+    const v = (narrow.matches && C.viewNarrow) || C.view || { lon: [-11, 33], lat: [35, 63.5] };
+    const [x0, z0] = toXZ(v.lon[0], v.lat[1]), [x1, z1] = toXZ(v.lon[1], v.lat[0]);
+    svg.setAttribute('viewBox', [x0, z0, x1 - x0, z1 - z0].map(n => n.toFixed(1)).join(' '));
+  }
+  setView();
+  if (narrow.addEventListener) narrow.addEventListener('change', setView);
+  const [bx0, bz0, bx1, bz1] = M.box;
+  el('rect', { x: bx0, y: bz0, width: bx1 - bx0, height: bz1 - bz0, fill: 'var(--sea)' }, svg);
+
+  const byIso = {};
+  for (const c of C.countries) byIso[c.iso] = c;
+  const gLand = el('g', {}, svg), gPick = el('g', {}, svg), gDot = el('g', {}, svg), gLbl = el('g', {}, svg);
+  const paths = {};
+  for (const c of M.countries) {
+    const pc = byIso[c.c];
+    const p = el('path', { d: pathOf(c.r), class: pc ? 'pick' : 'land' }, pc ? gPick : gLand);
+    if (pc) { p.setAttribute('fill', pc.color); paths[pc.id] = p; }
+  }
+  const cards = $('cards');
+  cards.textContent = '';
+  const go = c => { location.href = c.href; };
+  const hi = (c, on) => { if (paths[c.id]) paths[c.id].classList.toggle('on', on); if (c.card) c.card.classList.toggle('on', on); };
+  for (const c of C.countries) {
+    for (const [lon, lat] of c.schools || []) { const [x, z] = toXZ(lon, lat); el('circle', { cx: x.toFixed(2), cy: z.toFixed(2), r: 0.42, class: 'dot' }, gDot); }
+    const [lx, lz] = toXZ(c.label.lon, c.label.lat);
+    const t = el('text', { x: lx.toFixed(1), y: lz.toFixed(1), class: 'lbl' }, gLbl);
+    t.textContent = c.ko;
+    const n = el('tspan', { x: lx.toFixed(1), dy: '2.2', class: 'n' }, t);
+    n.textContent = c.local;
+    if (paths[c.id]) {
+      paths[c.id].addEventListener('click', () => go(c));
+      paths[c.id].addEventListener('mouseenter', () => hi(c, true));
+      paths[c.id].addEventListener('mouseleave', () => hi(c, false));
+      const tt = el('title', {}, paths[c.id]); tt.textContent = c.ko + ' 한글학교 로비로';
+    }
+    const a = document.createElement('a');
+    a.className = 'card'; a.href = c.href; a.style.setProperty('--c', c.color);
+    a.innerHTML = '<span class="sw"></span><span class="t"><span class="nm"></span><span class="sub"></span></span><span class="go"></span>';
+    a.querySelector('.sw').textContent = c.flagText || c.ko.slice(0, 1);
+    a.querySelector('.nm').textContent = c.ko + ' 로비';
+    a.querySelector('.sub').textContent = c.local + ' · ';
+    const cnt = document.createElement('span'); cnt.className = 'cnt'; cnt.textContent = '한글학교 ' + (c.schools || []).length + '곳';
+    a.querySelector('.sub').appendChild(cnt);
+    if (c.tag) { const s = document.createElement('span'); s.className = 'tag'; s.textContent = c.tag; a.querySelector('.sub').prepend(s); }
+    a.querySelector('.go').textContent = '들어가기';
+    a.addEventListener('mouseenter', () => hi(c, true));
+    a.addEventListener('mouseleave', () => hi(c, false));
+    a.addEventListener('focus', () => hi(c, true));
+    a.addEventListener('blur', () => hi(c, false));
+    c.card = a;
+    cards.appendChild(a);
+  }
+})();
+</script>
+</body>
+</html>

@@ -15,10 +15,14 @@
 //   문서 'xr/hall/<관 id>' = { text: { "경로": "글" }, media: { "<교과 id>": { book, tv, album, links } } }. 경로는 로비 설정(rooms.<관>)의 글 자리
 //   (예 principal.lines, zones[0].line). 로비가 열릴 때 /api/content?map=xr 의 halls.<관>.text 를 설정 위에 덮는다. 사진은 imgs(school = 관 id).
 
+// 2026-10-31(유럽 한글학교 메타버스 A안): map 'de' = 독일 한글학교 로비(de/), 'uk' = 영국 한글학교 로비(uk/). 프랑스와 같은 문서 꼴(school·room),
+//   계정은 영역마다 따로('de:아이디'·'uk:아이디'), 첫 관리자 설정 코드는 ADMIN_SETUP_HASH_DE·ADMIN_SETUP_HASH_UK(쓴 표시 'setupUsed:de'·'setupUsed:uk').
+//   관리자 페이지는 같은 admin/에서 ?map=de·?map=uk. 시드는 프랑스(fr)만.
+
 import SEED from './seed-fr.js';
 
 const ADMIN_ORIGINS = ['https://humanteacher89-cell.github.io'];
-const MAPS = { fr: true, xr: true };
+const MAPS = { fr: true, xr: true, de: true, uk: true };
 const HALL_TEXT_KEYS = 300, HALL_TEXT_MAX = 4000, HALL_MEDIA_KEYS = 12, HALL_PHOTOS = 30;
 const PATH_RE = /^[A-Za-z][A-Za-z0-9_]{0,30}(\.[A-Za-z][A-Za-z0-9_]{0,30}|\[\d{1,2}\])*$/;
 const MAX_IMG = 1800000;               // SQLite 행 하나 2MB 한도 아래

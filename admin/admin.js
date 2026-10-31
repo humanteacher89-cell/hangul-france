@@ -1,12 +1,19 @@
-// 프랑스 한글학교 로비 관리자 페이지 (2026-10-06, XR개발부)
+// 한글학교 로비 관리자 페이지 (2026-10-06 프랑스, 2026-10-31 독일·영국도, XR개발부)
 // 로그인 → 학교 고르기 → 홈페이지·교실 글·사진첩·TV 영상·링크를 고쳐 Cloudflare 저장소(/api/admin/*)에 저장한다.
-// 기본 글은 로비 설정(../lobby.config.js)에서 읽는다. 기본 글과 같은 칸은 빈 값으로 저장해 '기본 글'로 남긴다(로비의 [예시] 표시 유지).
+// 영역(나라)은 주소의 ?map= 값: 없으면 fr(프랑스, 옛 주소 그대로), ?map=de 독일, ?map=uk 영국. 영역마다 계정·설정 코드가 따로다.
+// 기본 글은 그 나라 로비 설정(MAPS[].cfg)에서 읽는다. 기본 글과 같은 칸은 빈 값으로 저장해 '기본 글'로 남긴다(로비의 [예시] 표시 유지).
 // 비밀번호는 이 브라우저에서 PBKDF2(SHA-256, 310,000번)로 바꾼 값만 서버로 보낸다. 서버 주소는 ../relay.json(시험: ?api=http://127.0.0.1:8791).
 (function () {
   'use strict';
   const $ = id => document.getElementById(id);
   const Q = new URLSearchParams(location.search);
-  const MAP = 'fr', ITER = 310000, LS = 'frLobbyAdmin', LS_SCHOOL = 'frLobbyAdminSchool';
+  const MAPS = {
+    fr: { cfg: '../lobby.config.js', lobby: '../' },
+    de: { cfg: '../de/lobby.config.js', lobby: '../de/' },
+    uk: { cfg: '../uk/lobby.config.js', lobby: '../uk/' }
+  };
+  const MAP = MAPS[Q.get('map')] ? Q.get('map') : 'fr', ITER = 310000;
+  const LS = MAP === 'fr' ? 'frLobbyAdmin' : MAP + 'LobbyAdmin', LS_SCHOOL = LS + 'School';   // 프랑스는 옛 이름 그대로(로그인 유지)
   const S = { api: '', token: '', me: null, cfg: null, content: { schools: {}, rooms: {} }, school: '', photos: [], links: [], quiz: [], dirty: false, busy: false, editing: null };
   const enc = new TextEncoder();
 
@@ -66,6 +73,8 @@
     return (ERR[k] || ('문제가 생겼어요' + (e && e.status ? ' (' + e.status + ')' : ''))).replace('{wait}', (e && e.wait) || 15);
   }
   async function api(method, path, body, raw) {
+    // 관리 요청은 모두 이 영역으로(서버는 map이 없으면 fr로 본다 — 독일·영국 계정이 프랑스로 잘못 가지 않게)
+    if (path.startsWith('/api/admin/') && !/[?&]map=/.test(path)) path += (path.includes('?') ? '&' : '?') + 'map=' + MAP;
     const h = {};
     if (S.token) h.Authorization = 'Bearer ' + S.token;
     let b;
@@ -132,9 +141,14 @@
   }
   function bootMsg(t) { const p = $('boot').querySelector('p'); p.textContent = t; show('boot'); }
   async function boot() {
-    try { await loadScript('../lobby.config.js?t=' + Date.now()); } catch (_) { /* 아래에서 알림 */ }
+    try { await loadScript(MAPS[MAP].cfg + '?t=' + Date.now()); } catch (_) { /* 아래에서 알림 */ }
     S.cfg = window.LOBBY_CONFIG || null;
     if (!S.cfg) { bootMsg('로비 설정(lobby.config.js)을 읽지 못했어요. 새로 고침해 주세요.'); return; }
+    const ttl = (S.cfg.text && S.cfg.text.title) || '한글학교 로비';
+    document.title = ttl + ' 관리';
+    const brand = document.querySelector('.brand b');
+    if (brand) brand.textContent = ttl;
+    $('viewLobby').href = MAPS[MAP].lobby;
     S.api = String(Q.get('api') || await apiFromRelay() || '').replace(/\/+$/, '');
     if (!S.api) { bootMsg('서버 주소(relay.json)를 찾지 못했어요.'); return; }
     if (Q.get('lobby')) $('viewLobby').href = Q.get('lobby');
