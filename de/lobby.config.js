@@ -261,7 +261,7 @@ window.LOBBY_CONFIG = {
       "name": "브란덴부르크 문",
       "lon": 13.3777,
       "lat": 52.5163,
-      "scale": 0.72
+      "scale": 0.6
     }
   ],
   mountains: [
