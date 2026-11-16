@@ -1,2 +1,7 @@
 push-github.bat
 _site/
+# 비밀 값 · 로컬 시험 흔적은 올리지 않는다(2026-11-17 보안 점검)
+.dev.vars*
+.env*
+.wrangler/
+node_modules/

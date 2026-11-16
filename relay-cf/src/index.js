@@ -16,12 +16,17 @@ const MAX_PER_ROOM = 70;   // 동시접속 60명 예정(2026-10-06 휴먼쌤) + 
 const TICK_MS = 100;
 const SWEEP_MS = 30000;    // 알람 간격: 소켓이 있는 동안만 30초마다 한 번 깨어 정리한다(알람은 객체를 계속 깨워 두지 않는다)
 const IDLE_MS = 150000;    // 이 시간 동안 메시지도 ping도 없는 소켓은 끊는다(클라이언트는 45초마다 ping)
-const ORIGINS = ['https://humanteacher89-cell.github.io'];
+// 2026-11-17 보안 점검: 받는 주소는 wrangler.jsonc의 MP_ORIGINS(쉼표로, 정확히 같은 주소만)와 이 PC 시험 주소(localhost)뿐이다.
+//   옛 github.io(지금은 넘김 쪽뿐)와 *.workers.dev · *.trycloudflare.com · claude.ai 계열, '*'는 뺐다. Origin이 없는 요청(브라우저가 아닌 것)도 받지 않는다.
+const ORIGINS = [];
 const SAY_MAX = 63;        // 말풍선 표현 번호 상한
 const SAY_MS = 1200;       // 한 사람이 말풍선을 보낼 수 있는 간격
 
 const cleanName = v => String(v ?? '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, 12);
-const cleanRoom = v => String(v ?? '').replace(/[^\w가-힣:-]/g, '').slice(0, 40) || 'lobby';
+// 방 이름 허용 목록(2026-11-17): '<영역>:<lobby 또는 학교 · 관 id>'에 시험용 꼬리('-글자', 주소의 ?room=)만. 영역은 지금 쓰는 넷
+//   (fr 프랑스 · de 독일 · uk 영국 · xr 가상융합 지도). 그 밖의 이름은 Durable Object를 만들기 전에 400으로 돌려보낸다. 영역을 새로 열면 여기에 더한다.
+const ROOM_RE = /^(fr|de|uk|xr):[a-z0-9_-]{2,24}(-[A-Za-z0-9_가-힣-]{1,20})?$/;
+const roomOf = v => { const s = String(v ?? ''); return ROOM_RE.test(s) ? s : ''; };
 const r2 = v => Math.round(v * 100) / 100;
 const cleanLook = v => Array.isArray(v) ? v.slice(0, 5).map(n => Math.max(0, Math.min(15, Math.floor(Number(n) || 0)))) : null;
 function cleanState(s) {
@@ -33,13 +38,11 @@ function cleanState(s) {
 }
 function originOk(req, env) {
   const o = req.headers.get('Origin');
-  if (!o) return true;                                   // 브라우저가 아닌 시험용 봇
-  const extra = String((env && env.MP_ORIGINS) || '').split(',').map(s => s.trim()).filter(Boolean);
-  if (extra.includes('*')) return true;
+  if (!o) return false;                                  // 브라우저는 WebSocket에 늘 Origin을 붙인다
   let u;
   try { u = new URL(o); } catch { return false; }
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(u.hostname)) return true;
-  if (u.protocol === 'https:' && /\.(trycloudflare\.com|claudeusercontent\.com|claude\.ai|workers\.dev)$/.test(u.hostname)) return true;
+  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(u.hostname)) return true;   // 이 PC 시험
+  const extra = String((env && env.MP_ORIGINS) || '').split(',').map(s => s.trim()).filter(Boolean);
   return ORIGINS.includes(u.origin) || extra.includes(u.origin);
 }
 const JSON_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*' };
@@ -55,7 +58,8 @@ export default {
     if (url.pathname === '/ws') {
       if (req.headers.get('Upgrade') !== 'websocket') return new Response('expected websocket', { status: 426 });
       if (!originOk(req, env)) return new Response('forbidden', { status: 403 });
-      const room = cleanRoom(url.searchParams.get('room'));
+      const room = roomOf(url.searchParams.get('room'));
+      if (!room) return new Response('bad room', { status: 400 });
       const stub = env.ROOMS.get(env.ROOMS.idFromName(room));
       return stub.fetch(req);
     }
@@ -81,7 +85,7 @@ export class Room {
 
   async fetch(req) {
     const url = new URL(req.url);
-    const room = cleanRoom(url.searchParams.get('room'));
+    const room = roomOf(url.searchParams.get('room'));   // 입구(fetch)에서 이미 걸렀다
     const pair = new WebSocketPair();
     const client = pair[0], server = pair[1];
     this.ctx.acceptWebSocket(server);

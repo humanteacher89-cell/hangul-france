@@ -149,9 +149,12 @@
     const brand = document.querySelector('.brand b');
     if (brand) brand.textContent = ttl;
     $('viewLobby').href = MAPS[MAP].lobby;
-    S.api = String(Q.get('api') || await apiFromRelay() || '').replace(/\/+$/, '');
+    // 2026-11-17 보안 점검: ?api= · ?lobby=는 이 PC 시험 주소만 받는다. 남이 만든 주소로 열면 비밀번호 값이 다른 서버로 가거나
+    //   '로비 보기'에 javascript: 주소가 들어갈 수 있어서다(그런 주소는 무시하고 relay.json · 기본 로비를 쓴다)
+    const local = v => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/.test(String(v || ''));
+    S.api = String((local(Q.get('api')) && Q.get('api')) || await apiFromRelay() || '').replace(/\/+$/, '');
     if (!S.api) { bootMsg('서버 주소(relay.json)를 찾지 못했어요.'); return; }
-    if (Q.get('lobby')) $('viewLobby').href = Q.get('lobby');
+    if (local(Q.get('lobby'))) $('viewLobby').href = Q.get('lobby');
     const saved = lsGet(LS, null);
     if (saved && saved.token) {
       S.token = saved.token;

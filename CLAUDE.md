@@ -27,7 +27,8 @@
 - 글 파일은 모두 UTF-8(한글). 한 줄에 문장이 여러 개인 JS가 많으니 줄 중간에 `//` 주석을 넣지 않는다(`/* */`만).
 - `france-map.js`는 손대지 않는다(도구가 만든 좌표 파일).
 - 글·학교 정보는 `lobby.config.js`에만 있다. 사실(학교 이름·주소, 교장 호칭)은 지어내지 않고, 모르면 `[예시]`·`[확인 전]`으로 표시하고 휴먼쌤에게 묻는다. 관리자 페이지에서 저장한 글이 코드의 기본 글보다 우선한다.
-- 서버가 허용하는 페이지 출처는 `https://humanteacher89-cell.github.io`뿐이다(`relay-cf/src/index.js`·`content.js`). 다른 주소로 옮기면 거기도 더해야 한다.
+- 서버가 받는 페이지 출처는 `relay-cf/wrangler.jsonc`의 `MP_ORIGINS`(온라인 접속) · `ADMIN_ORIGINS`(관리 요청)에 적은 주소와 localhost뿐이다(2026-11-17, 옛 github.io · `*.workers.dev` 등은 뺐고 Origin 없는 요청도 받지 않는다). 다른 주소로 옮기면 거기에 더한다. 방 이름은 `relay-cf/src/index.js`의 `ROOM_RE`(영역 fr · de · uk · xr)만 받는다.
+- 화면에 서버 글을 넣을 때는 `textContent`로만 넣는다(`innerHTML` 금지 — 2026-11-17 환영 글 XSS를 막음).
 - 큰 구조 변경(엔진 교체, 폴더 이동, 파일 이름 바꾸기, Worker 이름 바꾸기)은 먼저 휴먼쌤에게 묻는다. Worker 이름을 바꾸면 저장된 내용이 새 빈 저장소로 바뀐다.
 - 원본 작업 폴더는 휴먼쌤 PC에도 있다. PC 쪽은 작업 전에 이 저장소를 먼저 받아오므로, 여기서 고친 것은 `main`에 합쳐지기만 하면 된다.
 

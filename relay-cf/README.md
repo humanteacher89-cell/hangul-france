@@ -18,7 +18,12 @@
 ## 관리자 페이지 저장소 (`/api/*`, 2026-10-06)
 관리자 페이지(`/admin/`)에서 고친 학교 홈페이지 주소·교실 글·사진첩 사진·TV 유튜브 주소·링크와 관리자 계정을 Durable Object 하나(`Content`, SQLite)에 둡니다(`src/content.js`).
 - 공개: `GET /api/content?map=fr` (로비가 열릴 때 읽음), `GET /api/img/<id>` (사진)
-- 관리: `/api/admin/*` — 로그인 뒤 받은 토큰(Bearer)으로만. GitHub Pages와 이 PC 시험 주소(localhost)에서만 받습니다.
+- 관리: `/api/admin/*` — 로그인 뒤 받은 토큰(Bearer)으로만. `wrangler.jsonc`의 `ADMIN_ORIGINS`(공개 로비 주소)와 이 PC 시험 주소(localhost)에서만 받고, Origin이 없는 관리 요청도 받지 않습니다(2026-11-17).
+
+## 받는 주소 · 방 이름 (2026-11-17 보안 점검)
+- 온라인 접속(`/ws`)은 `wrangler.jsonc`의 `MP_ORIGINS`(쉼표로, 정확히 같은 주소만)와 localhost에서만 받습니다. 옛 github.io · `*.workers.dev` · `*.trycloudflare.com` · claude.ai 계열은 뺐고, Origin이 없는 접속도 받지 않습니다. 로비를 새 주소에서 열면 `MP_ORIGINS` · `ADMIN_ORIGINS`에 그 주소를 더합니다.
+- 방 이름은 `<영역>:<lobby 또는 학교 · 관 id>`(영역 fr · de · uk · xr, id는 영소문자 · 숫자 · `_` · `-` 2~24자)에 시험용 꼬리 `-글자`(주소의 `?room=`, 20자까지)만 받습니다. 그 밖은 Durable Object를 만들기 전에 400. 새 영역을 열면 `src/index.js`의 `ROOM_RE`에 더합니다.
+- 화면(로비 · 관리자 페이지)의 `?api=` · `?lobby=`는 이 PC 시험 주소만 받습니다(남이 만든 주소로 비밀번호 값이 다른 서버로 가지 않게).
 - 비밀번호는 브라우저가 PBKDF2로 바꾼 값만 오고, 서버는 계정마다 소금을 붙여 SHA-256으로 다시 바꿔 저장합니다. 5번 틀리면 15분 잠깁니다.
 - 첫 관리자: `wrangler.jsonc`의 `ADMIN_SETUP_HASH`는 1회용 설정 코드의 SHA-256입니다(코드 자체는 저장소에 없음). 코드를 새로 만들어 이 값을 바꿔 올리면 관리자 비밀번호를 다시 정할 수 있습니다.
 - 무료 한도: Durable Object 하나에 1GB(사진은 800MB까지로 막음), 사진 한 장 1.8MB(관리자 페이지가 1600px JPEG로 줄여 올림), 한 학교 60장.

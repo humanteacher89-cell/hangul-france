@@ -21,7 +21,8 @@
 
 import SEED from './seed-fr.js';
 
-const ADMIN_ORIGINS = ['https://humanteacher89-cell.github.io'];
+// 2026-11-17 보안 점검: 관리 요청은 wrangler.jsonc의 ADMIN_ORIGINS(정확히 같은 주소만)와 이 PC 시험 주소(localhost)에서만. 옛 github.io는 뺐다(지금은 넘김 쪽뿐)
+const ADMIN_ORIGINS = [];
 const MAPS = { fr: true, xr: true, de: true, uk: true };
 const HALL_TEXT_KEYS = 300, HALL_TEXT_MAX = 4000, HALL_MEDIA_KEYS = 12, HALL_PHOTOS = 30;
 const PATH_RE = /^[A-Za-z][A-Za-z0-9_]{0,30}(\.[A-Za-z][A-Za-z0-9_]{0,30}|\[\d{1,2}\])*$/;
@@ -97,7 +98,8 @@ function cleanRoom(d) {
   const bbsUrl = cleanUrl(bb.url);
   if (bbsUrl === null) throw new E(400, 'bbs');
   return {
-    boardTitle: str(d.boardTitle, 40), boardLine: str(d.boardLine, 60), welcome: str(d.welcome, 120),
+    // 환영 글은 화면 안내판에 뜨는 짧은 인사라 꺾쇠를 뺀다(2026-11-17, 화면이 글자로만 쓰는 것에 더한 이중 안전)
+    boardTitle: str(d.boardTitle, 40), boardLine: str(d.boardLine, 60), welcome: str(d.welcome, 120).replace(/[<>]/g, ''),
     principal: { name: str(p.name, 20), lines: (Array.isArray(p.lines) ? p.lines : []).map(x => str(x, 200)).filter(Boolean).slice(0, 8) },
     quiz: cleanQuiz(d.quiz),
     book: { title: str(b.title, 40), sub: str(b.sub, 60), text: str(b.text, 4000) },
@@ -169,7 +171,7 @@ function sniff(b) {
   return null;
 }
 
-// ── 주소 확인(CORS): 관리 요청은 GitHub Pages와 이 PC 시험 주소에서만 ──
+// ── 주소 확인(CORS): 관리 요청은 ADMIN_ORIGINS(공개 로비 주소)와 이 PC 시험 주소에서만 ──
 export function adminOriginOk(o, env) {
   if (!o) return false;
   let u;
@@ -192,7 +194,7 @@ export async function handleApi(req, env) {
   const admin = url.pathname.startsWith('/api/admin/');
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsFor(req, env, true) });
   const o = req.headers.get('Origin');
-  if (admin && o && !adminOriginOk(o, env)) {
+  if (admin && !adminOriginOk(o, env)) {   // Origin이 없는 관리 요청(브라우저 밖)도 받지 않는다(2026-11-17). 공개 읽기(/api/content · /api/img)는 그대로 누구나
     return new Response('{"error":"origin"}', { status: 403, headers: { 'Content-Type': 'application/json' } });
   }
   if (!env.CONTENT) return new Response('{"error":"nostore"}', { status: 503, headers: Object.assign({ 'Content-Type': 'application/json' }, corsFor(req, env, admin)) });

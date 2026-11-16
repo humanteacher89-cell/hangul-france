@@ -972,10 +972,12 @@
   function travelTo(s) { teleport(s.px, s.pz + 0.2); }
 
   // ── 화면 안내판 ──
+  // 2026-11-17 보안 점검: 안내판은 글자로만 쓴다(학교 담당자가 고친 환영 글이 HTML로 돌지 않게). 작은 둘째 줄은 sub로 넘긴다
   let toastTimer = 0;
-  function showToast(html, sec) {
+  function showToast(text, sec, sub) {
     const el = $('toast');
-    el.innerHTML = html;
+    el.textContent = String(text == null ? '' : text);
+    if (sub) { const s = document.createElement('small'); s.textContent = String(sub); el.appendChild(s); }
     el.hidden = false;
     toastTimer = sec || 2.4;
   }
@@ -1232,7 +1234,7 @@
       const rg = regionAt(ME.x, ME.z);
       if (rg && rg !== LAST_REGION) {
         LAST_REGION = rg;
-        showToast(`${rg.info.ko}<small>${localName(rg.info)}</small>`);
+        showToast(rg.info.ko, 0, localName(rg.info));
         $('region').textContent = rg.info.ko;
       }
       // 입장 발판
@@ -1567,8 +1569,10 @@
      CONTENT — 관리자 페이지(admin/)에서 고친 학교 홈페이지·교실 글·사진첩·TV 영상·링크(2026-10-06).
      relay.json의 api(Cloudflare 저장소)에서 /api/content를 한 번 읽어 lobby.config.js 값 위에 덮는다. 빈 값은 기본 글 그대로.
      서버가 없거나 늦으면(6초) 기본 글로 본다. 시험: ?api=http://127.0.0.1:8791
+     2026-11-17 보안 점검: ?api=는 이 PC 시험 주소(localhost · 127.0.0.1)만 받는다 — 남이 만든 주소로 다른 서버의 글이 뜨지 않게.
      ───────────────────────────────────────────────────────────── */
   const CONTENT = { api: '', loaded: false, v: 0 };
+  const localApi = v => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/.test(String(v || ''));
   function loadContent() {
     const go = api => {
       api = String(api || '').replace(/\/+$/, '');
@@ -1580,7 +1584,7 @@
         .then(r => (r.ok ? r.json() : null)).then(j => { clearTimeout(tm); if (j) applyContent(j); }).catch(() => clearTimeout(tm));
     };
     const q = Q.get('api');
-    if (q) { go(q); return; }
+    if (q && localApi(q)) { go(q); return; }
     if (!MPC.file) return;
     fetch(MPC.file + '?t=' + Date.now(), { cache: 'no-store' }).then(r => (r.ok ? r.json() : null))
       .then(j => { if (j) go(j.api || (typeof j.health === 'string' ? j.health.replace(/\/health\/?$/, '') : '')); }).catch(() => {});
