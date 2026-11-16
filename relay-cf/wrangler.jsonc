@@ -14,7 +14,7 @@
     { "tag": "v2", "new_sqlite_classes": ["Content"] }
   ],
   "vars": {
-    "MP_ORIGINS": "https://humanssaem-hangul-france.pages.dev,https://humanssaem-world.pages.dev",
+    "MP_ORIGINS": "https://humanssaem-hangul-france.pages.dev,https://humanssaem-world.pages.dev,https://world.human-teacher.com,https://hangeulworld.human-teacher.com",   // 11-16 주소 정리: 새 이름 둘
     // 관리자 1회용 설정 코드의 SHA-256(코드 자체는 저장소에 없다). 새 값으로 바꿔 배포하면 관리자 비밀번호를 다시 정할 수 있다
     "ADMIN_SETUP_HASH": "8bca06e19fefb1edd4ac0ee0b9a88e26a63f6fdb97739c7511b36cc3bfcd20cb",
     // 가상융합교육 지도(map xr) 관리자의 1회용 설정 코드 SHA-256 — 프랑스 로비와 계정이 따로다(2026-10-09). 바꿔 배포하면 xr 쪽 로그인만 풀린다
@@ -23,7 +23,7 @@
     "ADMIN_SETUP_HASH_DE": "02f70ccc7b40097ced5bcaf7a0043df6e1e7e5802b36ba242a78f180fb412691",
     "ADMIN_SETUP_HASH_UK": "845714e8fb60cb207ca41c9e8ef0ca939232770b0c3cd1d299db0a8a9f7d7c6b",
     // 관리 요청을 더 받을 주소(쉼표로). GitHub Pages와 이 PC 시험 주소는 코드에 들어 있다
-    "ADMIN_ORIGINS": "https://humanssaem-hangul-france.pages.dev,https://humanssaem-world.pages.dev"
+    "ADMIN_ORIGINS": "https://humanssaem-hangul-france.pages.dev,https://humanssaem-world.pages.dev,https://world.human-teacher.com,https://hangeulworld.human-teacher.com"
   },
   "observability": { "enabled": true }
 }
