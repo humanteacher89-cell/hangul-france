@@ -22,6 +22,7 @@
     // 독일 로비(map de)·영국 로비(map uk) 관리자의 1회용 설정 코드 SHA-256 — 나라마다 계정이 따로다(2026-10-31, 유럽 한글학교 메타버스)
     "ADMIN_SETUP_HASH_DE": "02f70ccc7b40097ced5bcaf7a0043df6e1e7e5802b36ba242a78f180fb412691",
     "ADMIN_SETUP_HASH_UK": "845714e8fb60cb207ca41c9e8ef0ca939232770b0c3cd1d299db0a8a9f7d7c6b",
+    "ADMIN_SETUP_HASH_EU": "174ee234c3e13c4fe8f48a7ba5e943bae16fdaf7658734e608f5b9d894fe969f",
     // 관리 요청을 더 받을 주소(쉼표로). GitHub Pages와 이 PC 시험 주소는 코드에 들어 있다
     "ADMIN_ORIGINS": "https://humanssaem-hangul-france.pages.dev,https://humanssaem-world.pages.dev,https://world.human-teacher.com,https://hangeulworld.human-teacher.com"
   },

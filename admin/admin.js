@@ -14,7 +14,10 @@
   };
   const MAP = MAPS[Q.get('map')] ? Q.get('map') : 'fr', ITER = 310000;
   const LS = MAP === 'fr' ? 'frLobbyAdmin' : MAP + 'LobbyAdmin', LS_SCHOOL = LS + 'School';   // 프랑스는 옛 이름 그대로(로그인 유지)
-  const S = { api: '', token: '', me: null, cfg: null, content: { schools: {}, rooms: {} }, school: '', photos: [], links: [], quiz: [], dirty: false, busy: false, editing: null };
+  // 통합 관리자(2026-11-18 휴먼쌤 "관리자계정은 1개로 통합하고, 그 안에서 독일 영국 프랑스처럼 국가를 선택하게"): 계정 하나로 세 나라.
+  //   로그인은 따로 저장(LS_EU)하고 어느 나라 화면에서나 쓴다. 마지막에 본 나라는 LS_EU_MAP
+  const LS_EU = 'euLobbyAdmin', LS_EU_MAP = 'euLobbyAdminMap';
+  const S = { api: '', token: '', tokKey: '', me: null, cfg: null, content: { schools: {}, rooms: {} }, school: '', photos: [], links: [], quiz: [], dirty: false, busy: false, editing: null };
   const enc = new TextEncoder();
 
   // ── 작은 도구 ──
@@ -149,21 +152,29 @@
     const brand = document.querySelector('.brand b');
     if (brand) brand.textContent = ttl;
     $('viewLobby').href = MAPS[MAP].lobby;
+    if (AUTO) {   // 통합 주소(/admin/)의 처음 설정은 통합 관리자(세 나라를 계정 하나로)
+      $('setup').querySelector('h1').textContent = '통합 관리자 만들기';
+      $('setup').querySelector('p.muted').textContent = '받은 1회용 설정 코드를 넣고, 앞으로 쓸 아이디와 비밀번호를 정해 주세요. 이 계정 하나로 프랑스 · 독일 · 영국을 모두 관리해요. 코드는 한 번만 쓸 수 있어요.';
+      $('setupGo').textContent = '통합 관리자 만들기';
+    }
     // 2026-11-17 보안 점검: ?api= · ?lobby=는 이 PC 시험 주소만 받는다. 남이 만든 주소로 열면 비밀번호 값이 다른 서버로 가거나
     //   '로비 보기'에 javascript: 주소가 들어갈 수 있어서다(그런 주소는 무시하고 relay.json · 기본 로비를 쓴다)
     const local = v => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/.test(String(v || ''));
     S.api = String((local(Q.get('api')) && Q.get('api')) || await apiFromRelay() || '').replace(/\/+$/, '');
     if (!S.api) { bootMsg('서버 주소(relay.json)를 찾지 못했어요.'); return; }
     if (local(Q.get('lobby'))) $('viewLobby').href = Q.get('lobby');
-    const saved = lsGet(LS, null);
+    const saved = lsGet(LS, null), gsaved = lsGet(LS_EU, null);
+    // 통합 주소(/admin/)로 열었는데 통합 관리자 로그인이 있으면 마지막에 본 나라로
+    if (AUTO && gsaved && gsaved.token) { location.replace('?map=' + lastRealm()); return; }
     // 통합 주소(/admin/)로 열었는데 프랑스 로그인은 없고 독일 · 영국 로그인이 남아 있으면 그 나라 화면으로
     if (AUTO && !(saved && saved.token)) {
       const other = ['de', 'uk'].find(m => { const v = lsGet(lsKey(m), null); return v && v.token; });
       if (other) { location.replace('?map=' + other); return; }
     }
-    if (saved && saved.token) {
-      S.token = saved.token;
-      try { const me = await api('GET', '/api/admin/me'); S.me = me; await enterMain(); return; } catch (_) { S.token = ''; lsSet(LS, null); }
+    for (const [k, v] of [[LS, saved], [LS_EU, gsaved]]) {
+      if (!(v && v.token)) continue;
+      S.token = v.token; S.tokKey = k;
+      try { const me = await api('GET', '/api/admin/me'); S.me = me; await enterMain(); return; } catch (_) { S.token = ''; S.tokKey = ''; lsSet(k, null); }
     }
     let st;
     try { st = await api('GET', '/api/admin/state'); } catch (e) { bootMsg(errText(e)); return; }
@@ -175,21 +186,30 @@
   const AUTO = !Q.get('map');
   const REALM_NAME = { fr: '프랑스', de: '독일', uk: '영국' };
   const lsKey = m => m === 'fr' ? 'frLobbyAdmin' : m + 'LobbyAdmin';
+  const lastRealm = () => { const m = lsGet(LS_EU_MAP, 'fr'); return REALM_NAME[m] ? m : 'fr'; };
   function goRealm(j) {
     lsSet(lsKey(j.realm), { token: j.token, user: j.user });
     location.replace('?map=' + j.realm);
   }
   function afterLogin(j) {
+    for (const id of ['loginPw', 'setupPw', 'setupPw2', 'setupCode']) $(id).value = '';
+    if (j.realm === 'eu') {   // 통합 관리자: 로그인은 따로 두고, 통합 주소면 마지막에 본 나라로
+      lsSet(LS_EU, { token: j.token, user: j.user });
+      if (AUTO) { location.replace('?map=' + lastRealm()); return; }
+      S.token = j.token; S.tokKey = LS_EU;
+      S.me = { user: j.user, role: 'admin', schools: [], global: true };
+      return enterMain();
+    }
     if (j.realm && j.realm !== MAP) return goRealm(j);
-    S.token = j.token;
+    S.token = j.token; S.tokKey = LS;
     S.me = { user: j.user, role: j.role, schools: j.schools || [] };
     lsSet(LS, { token: j.token, user: j.user });
-    for (const id of ['loginPw', 'setupPw', 'setupPw2', 'setupCode']) $(id).value = '';
     return enterMain();
   }
   function logoutLocal() {
     S.token = ''; S.me = null; S.dirty = false;
-    lsSet(LS, null);
+    lsSet(S.tokKey || LS, null); S.tokKey = '';
+    $('realmPick').hidden = true;
     show('login');
   }
   $('loginForm').addEventListener('submit', async e => {
@@ -222,7 +242,13 @@
     if (pw.length < 8) { setErr('setupErr', '비밀번호는 8자 이상으로 해 주세요.'); return; }
     if (pw !== $('setupPw2').value) { setErr('setupErr', '비밀번호 확인이 달라요.'); return; }
     busy('setupGo', true, '만드는 중…');
-    try { const key = await deriveKey(user, pw); afterLogin(await api('POST', '/api/admin/setup', { code: $('setupCode').value, user, key })); toast('관리자를 만들었어요.'); }
+    // 통합 주소(/admin/)의 처음 설정 = 통합 관리자(eu). 나라 주소(?map=de 등)는 그 나라 관리자
+    try {
+      const key = await deriveKey(user, pw);
+      const j = await api('POST', '/api/admin/setup' + (AUTO ? '?map=eu' : ''), { code: $('setupCode').value, user, key });
+      toast('관리자를 만들었어요.');
+      afterLogin(AUTO ? Object.assign(j, { realm: 'eu' }) : j);
+    }
     catch (er) { setErr('setupErr', errText(er)); }
     finally { busy('setupGo', false); }
   });
@@ -237,7 +263,10 @@
   // ── 내용 고치기 ──
   const allowed = id => S.me && (S.me.role === 'admin' || (S.me.schools || []).includes(id));
   async function enterMain() {
-    $('whoName').textContent = S.me.user + (S.me.role === 'admin' ? ' · 관리자' : ' · 학교 담당');
+    $('whoName').textContent = S.me.user + (S.me.global ? ' · 통합 관리자' : S.me.role === 'admin' ? ' · 관리자' : ' · 학교 담당');
+    // 통합 관리자만: 나라 고르기(프랑스 · 독일 · 영국)
+    $('realmPick').hidden = !S.me.global;
+    if (S.me.global) { $('realmSel').value = MAP; lsSet(LS_EU_MAP, MAP); }
     $('btnUsers').hidden = S.me.role !== 'admin';
     $('pwUser').value = S.me.user;
     fillSchools();
@@ -614,7 +643,7 @@
       r.textContent = (u.role === 'admin' ? '모든 학교' : (u.schools.map(schoolName).join(', ') || '담당 학교 없음')) + (u.last ? ' · 마지막 로그인 ' + fmt(u.last) : ' · 아직 로그인 안 함');
       t.append(b, tag, r);
       row.append(t, mkBtn('고치기', () => editUser(u)));
-      if (u.user !== S.me.user) row.append(mkBtn('지우기', () => delUser(u), 'danger'));
+      if (S.me.global || u.user !== S.me.user) row.append(mkBtn('지우기', () => delUser(u), 'danger'));   // 통합 관리자는 이 나라 계정을 모두 지울 수 있다
       list.appendChild(row);
     }
   }
@@ -646,6 +675,40 @@
     setErr('bulkMsg', `만든 계정 ${made.length}개: ${made.join(', ') || '없음'}` + (failed.length ? ` / 못 만든 것: ${failed.join(', ')}` : ''));
     toast(made.length ? `계정 ${made.length}개를 만들었어요. 각 학교에 아이디와 첫 비밀번호를 알려 주세요.` : '만든 계정이 없어요.', !made.length);
     await loadUsers();
+  });
+  // 이미 있는 학교 계정 비밀번호를 한꺼번에 다시 정하기(2026-11-18 휴먼쌤 "전부다 첫 비밀번호는 12345678로"):
+  //   아이디가 학교 영문 이름인 '학교 담당' 계정만(관리자 · 다른 이름 계정은 그대로). 바꾸면 그 계정들의 로그인이 풀린다
+  $('bulkReset').addEventListener('click', async () => {
+    if (S.busy) return;
+    setErr('bulkErr', ''); setErr('bulkMsg', '');
+    const pw = $('bulkPw').value;
+    if (pw.length < 8) { setErr('bulkErr', '비밀번호는 8자 이상으로 해 주세요.'); return; }
+    let users;
+    try { users = (await api('GET', '/api/admin/users')).users; } catch (er) { setErr('bulkErr', errText(er)); return; }
+    const ids = new Set((S.cfg.schools || []).map(s => normUser(s.id)));
+    const todo = users.filter(u => u.role !== 'admin' && ids.has(u.user));
+    if (!todo.length) { setErr('bulkMsg', '다시 정할 학교 계정이 없어요.'); return; }
+    if (!confirm(`학교 계정 ${todo.length}개의 비밀번호를 모두 이 첫 비밀번호로 다시 정할까요?\n그 학교 선생님들은 다시 로그인해야 해요.\n${todo.map(u => u.user).join(', ')}`)) return;
+    busy('bulkReset', true, '바꾸는 중…');
+    const done = [], failed = [];
+    for (const u of todo) {
+      try { await api('POST', '/api/admin/users', { user: u.user, role: 'editor', schools: u.schools, key: await deriveKey(u.user, pw) }); done.push(u.user); }
+      catch (er) { failed.push(`${u.user}(${errText(er)})`); }
+    }
+    busy('bulkReset', false);
+    $('bulkPw').value = '';
+    setErr('bulkMsg', `비밀번호를 다시 정한 계정 ${done.length}개: ${done.join(', ') || '없음'}` + (failed.length ? ` / 못 바꾼 것: ${failed.join(', ')}` : ''));
+    toast(done.length ? `학교 계정 ${done.length}개의 비밀번호를 다시 정했어요.` : '바꾼 계정이 없어요.', !done.length);
+    await loadUsers();
+  });
+  // 나라 고르기(통합 관리자만)
+  $('realmSel').addEventListener('change', () => {
+    const m = $('realmSel').value;
+    if (m === MAP) return;
+    if (S.dirty && !confirm('저장하지 않은 고침이 있어요. 버리고 다른 나라로 갈까요?')) { $('realmSel').value = MAP; return; }
+    S.dirty = false;
+    lsSet(LS_EU_MAP, m);
+    location.replace('?map=' + m);
   });
   $('uReset').addEventListener('click', resetUserForm);
   $('userForm').addEventListener('submit', async e => {

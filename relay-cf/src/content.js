@@ -18,6 +18,9 @@
 // 2026-10-31(유럽 한글학교 메타버스 A안): map 'de' = 독일 한글학교 로비(de/), 'uk' = 영국 한글학교 로비(uk/). 프랑스와 같은 문서 꼴(school·room),
 //   계정은 영역마다 따로('de:아이디'·'uk:아이디'), 첫 관리자 설정 코드는 ADMIN_SETUP_HASH_DE·ADMIN_SETUP_HASH_UK(쓴 표시 'setupUsed:de'·'setupUsed:uk').
 //   관리자 페이지는 같은 admin/에서 ?map=de·?map=uk. 시드는 프랑스(fr)만.
+// 2026-11-18 통합 관리자(휴먼쌤 "관리자계정은 1개로 통합하고, 그 안에서 독일 영국 프랑스처럼 국가를 선택하게 해줘"): 영역 'eu' 계정('eu:아이디', 늘 admin)
+//   하나로 프랑스 · 독일 · 영국(AUTO_REALMS)을 모두 관리한다. 'eu' 로그인 토큰은 ?map=fr·de·uk 요청에서 그 나라 관리자로 통한다(가상융합 xr은 협회 일이라 빠짐).
+//   만드는 법은 다른 영역과 같다: ADMIN_SETUP_HASH_EU(1회용 설정 코드), 쓴 표시 'setupUsed:eu'. ?map=eu는 state · setup · login에만 쓴다.
 
 import SEED from './seed-fr.js';
 
@@ -33,6 +36,7 @@ const SESSION_MS = 14 * 864e5;         // 로그인 유지 14일
 const LOCK_FAILS = 10, LOCK_IP_FAILS = 50, LOCK_MS = 5 * 60e3;   // 5분 안에 10번(같은 접속 주소는 50번) 틀리면 잠근다
 const LOCK_HOLD = 60e3;                // 잠그는 시간 1분(2026-11-17 휴먼쌤 "잠김시간 1분으로", 앞은 5분)
 const AUTO_REALMS = ['fr', 'de', 'uk'];   // 나라 통합 로그인(?map=auto)이 찾는 영역. 가상융합(xr)은 관리 화면이 달라 넣지 않는다
+const SUPER = 'eu';                       // 통합 관리자 영역(2026-11-18): 이 계정 하나로 AUTO_REALMS를 모두 관리
 const FAILS_RESET = '20261025';        // 이 값을 바꿔 배포하면 그때 걸려 있던 잠금이 모두 풀린다
 const ORPHAN_MS = 6 * 3600e3;          // 올렸지만 교실에 저장하지 않은 사진은 6시간 뒤 그 교실을 저장할 때 지운다
 
@@ -244,7 +248,8 @@ export class Content {
       const r = p.slice('/api/admin/'.length);
       // 나라 통합 로그인(2026-11-17 휴먼쌤 "영국 아이디를 쓰면 영국 관리자로 들어가고 프랑스는 프랑스로"): 아이디로 나라를 찾는다
       if (r === 'login' && m === 'POST' && url.searchParams.get('map') === 'auto') return this.out(H, await this.loginAuto(req));
-      const realm = mapOf(url);   // 영역(fr·xr)마다 계정이 따로
+      // 영역(fr·xr·de·uk)마다 계정이 따로. 통합 관리자(eu)는 처음 설정 · 로그인 · 상태에만 ?map=eu
+      const realm = (url.searchParams.get('map') === SUPER && (r === 'state' || r === 'setup' || r === 'login')) ? SUPER : mapOf(url);
       if (r === 'state' && m === 'GET') return this.out(H, { ready: this.adminCount(realm) > 0, setup: this.setupOpen(realm) });
       if (r === 'setup' && m === 'POST') return this.out(H, await this.setup(req, realm));
       if (r === 'login' && m === 'POST') return this.out(H, await this.login(req, realm));
@@ -329,7 +334,14 @@ export class Content {
   setupHash(realm) { const h = String(this.env[realm === 'fr' ? 'ADMIN_SETUP_HASH' : 'ADMIN_SETUP_HASH_' + realm.toUpperCase()] || '').trim().toLowerCase(); return /^[0-9a-f]{64}$/.test(h) ? h : ''; }
   setupOpen(realm) { const h = this.setupHash(realm); return !!h && this.meta(usedKey(realm)) !== h; }
   getUser(uk) { return this.row('SELECT * FROM users WHERE name = ?', uk); }
-  who(me) { return { user: me.name, role: me.role, schools: me.schools }; }
+  who(me) { return { user: me.name, role: me.role, schools: me.schools, global: !!me.global }; }
+  // 통합 관리자 비밀번호가 맞으면 저장 이름('eu:아이디'), 아니면 null
+  async superOk(name, key) {
+    const u = this.getUser(ukey(SUPER, name));
+    if (!u || u.role !== 'admin') return null;
+    this.lockCheck('u:' + u.name);
+    return same(await sha(u.salt + key), u.hash) ? u.name : null;
+  }
   lockCheck(k) {
     const r = this.row('SELECT until FROM fails WHERE k = ?', k);
     if (r && r.until && r.until > Date.now()) throw new E(429, 'locked', { wait: Math.ceil((r.until - Date.now()) / 60000) });
@@ -383,7 +395,12 @@ export class Content {
     this.lockCheck(ukk);
     const u = this.getUser(uk);
     const ok = !!u && same(await sha(u.salt + key), u.hash);
-    if (!ok) { this.fail(ipk, LOCK_IP_FAILS); this.fail(ukk); throw new E(401, 'login'); }
+    if (!ok) {
+      // 나라 주소(?map=de 등)에 통합 관리자 아이디를 넣어도 들어가게(2026-11-18)
+      const g = AUTO_REALMS.includes(realm) ? await this.superOk(splitKey(uk).name, key) : null;
+      if (g) { this.run('DELETE FROM fails WHERE k = ?', ukk); return Object.assign(await this.issue(g), { realm: SUPER }); }
+      this.fail(ipk, LOCK_IP_FAILS); this.fail(ukk); throw new E(401, 'login');
+    }
     this.run('DELETE FROM fails WHERE k = ?', ukk);
     return this.issue(uk);
   }
@@ -395,6 +412,9 @@ export class Content {
     const ipk = 'ip:' + this.ip(req), ak = 'u:auto:' + name;
     this.lockCheck(ipk);
     this.lockCheck(ak);
+    // 통합 관리자가 먼저(2026-11-18): 맞으면 나라를 고르지 않고 통합 관리자로
+    const g = await this.superOk(name, key);
+    if (g) { this.run('DELETE FROM fails WHERE k = ?', ak); return Object.assign(await this.issue(g), { realm: SUPER }); }
     const ok = [];
     for (const realm of AUTO_REALMS) {
       const uk = ukey(realm, name), u = this.getUser(uk);
@@ -418,8 +438,10 @@ export class Content {
     const u = this.getUser(s.name);
     if (!u) return null;
     const k = splitKey(u.name);
-    if (k.realm !== realm) return null;   // 다른 영역(프랑스 ↔ 가상융합)의 로그인은 쓸 수 없다
-    return { name: k.name, uk: u.name, realm, role: u.role, schools: JSON.parse(u.schools || '[]'), h };
+    // 통합 관리자(eu)는 프랑스 · 독일 · 영국 어느 나라 요청에서도 그 나라 관리자로 통한다(가상융합 xr은 아님)
+    const global = k.realm === SUPER && u.role === 'admin' && AUTO_REALMS.includes(realm);
+    if (k.realm !== realm && !global) return null;   // 다른 영역(프랑스 ↔ 가상융합)의 로그인은 쓸 수 없다
+    return { name: k.name, uk: u.name, realm, role: u.role, schools: JSON.parse(u.schools || '[]'), h, global };
   }
   async password(req, me) {
     const b = await this.body(req);
@@ -445,7 +467,7 @@ export class Content {
     const schools = role === 'admin' ? [] : [...new Set((Array.isArray(b.schools) ? b.schools : []).map(idOf))].slice(0, 30);
     const u = this.getUser(uk);
     if (!u && !b.key) throw new E(400, 'key');
-    if (name === me.name && role !== 'admin') throw new E(400, 'self');
+    if (uk === me.uk && role !== 'admin') throw new E(400, 'self');   // 통합 관리자는 나라 계정과 저장 이름이 달라 같은 아이디의 나라 계정도 고칠 수 있다
     const key = b.key ? cleanKey(b.key) : null;
     await this.putUser(uk, role, schools, key);
     if (u && key) this.run('DELETE FROM sess WHERE name = ?', uk);   // 비밀번호를 바꾸면 그 계정의 로그인이 풀린다
@@ -454,7 +476,7 @@ export class Content {
   delUser(url, me) {
     this.adminOnly(me);
     const name = cleanUser(url.searchParams.get('user')), uk = ukey(me.realm, name);
-    if (name === me.name) throw new E(400, 'self');
+    if (uk === me.uk) throw new E(400, 'self');
     this.run('DELETE FROM users WHERE name = ?', uk);
     this.run('DELETE FROM sess WHERE name = ?', uk);
     return { ok: true };
