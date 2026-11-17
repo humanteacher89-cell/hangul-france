@@ -5,7 +5,7 @@ window.LOBBY_CONFIG = {
   version: 'v0.3-de',
   contentMap: 'de',          // 관리자 내용 영역(서버 map)
   flag: 'de', countryFoot: 'Deutschland',
-  europeUrl: '../eu/',
+  europeUrl: '../',
   layout: { relax: true, minGap: 3.3 },   // 가까운 학교 건물이 겹치지 않게 조금씩 벌린다(엔진 placeSchools)
   text: {
     "title": "독일 한글학교 로비",
