@@ -156,6 +156,11 @@
     if (!S.api) { bootMsg('서버 주소(relay.json)를 찾지 못했어요.'); return; }
     if (local(Q.get('lobby'))) $('viewLobby').href = Q.get('lobby');
     const saved = lsGet(LS, null);
+    // 통합 주소(/admin/)로 열었는데 프랑스 로그인은 없고 독일 · 영국 로그인이 남아 있으면 그 나라 화면으로
+    if (AUTO && !(saved && saved.token)) {
+      const other = ['de', 'uk'].find(m => { const v = lsGet(lsKey(m), null); return v && v.token; });
+      if (other) { location.replace('?map=' + other); return; }
+    }
     if (saved && saved.token) {
       S.token = saved.token;
       try { const me = await api('GET', '/api/admin/me'); S.me = me; await enterMain(); return; } catch (_) { S.token = ''; lsSet(LS, null); }
@@ -166,7 +171,16 @@
   }
 
   // ── 로그인·처음 설정·로그아웃 ──
+  // 나라 통합 로그인(2026-11-17): ?map= 없이 연 /admin/은 아이디로 나라를 찾는다. 다른 나라면 그 나라 관리 화면(?map=)으로 옮긴다
+  const AUTO = !Q.get('map');
+  const REALM_NAME = { fr: '프랑스', de: '독일', uk: '영국' };
+  const lsKey = m => m === 'fr' ? 'frLobbyAdmin' : m + 'LobbyAdmin';
+  function goRealm(j) {
+    lsSet(lsKey(j.realm), { token: j.token, user: j.user });
+    location.replace('?map=' + j.realm);
+  }
   function afterLogin(j) {
+    if (j.realm && j.realm !== MAP) return goRealm(j);
     S.token = j.token;
     S.me = { user: j.user, role: j.role, schools: j.schools || [] };
     lsSet(LS, { token: j.token, user: j.user });
@@ -184,7 +198,19 @@
     setErr('loginErr', '');
     const user = normUser($('loginUser').value), pw = $('loginPw').value;
     busy('loginGo', true, '확인 중…');
-    try { const key = await deriveKey(user, pw); afterLogin(await api('POST', '/api/admin/login', { user, key })); }
+    try {
+      const key = await deriveKey(user, pw);
+      const j = await api('POST', '/api/admin/login' + (AUTO ? '?map=auto' : ''), { user, key });
+      if (j.pick) {   // 같은 아이디 · 비밀번호가 여러 나라에 있으면 고른다
+        const box = $('loginErr'); box.textContent = '어느 나라 관리 화면으로 갈까요? '; box.hidden = false;
+        for (const m of j.pick) box.appendChild(mkBtn(REALM_NAME[m] || m, async () => {
+          try { const k = await api('POST', '/api/admin/login?map=' + m, { user, key }); afterLogin(Object.assign(k, { realm: m })); }
+          catch (er2) { setErr('loginErr', errText(er2)); }
+        }));
+        return;
+      }
+      afterLogin(j);
+    }
     catch (er) { setErr('loginErr', errText(er)); }
     finally { busy('loginGo', false); }
   });

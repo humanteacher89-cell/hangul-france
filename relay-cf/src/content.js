@@ -30,7 +30,9 @@ const MAX_IMG = 1800000;               // SQLite 행 하나 2MB 한도 아래
 const MAX_IMGS_SCHOOL = 60;
 const MAX_IMG_TOTAL = 800 * 1000000;   // 사진 전체 800MB까지(무료 플랜은 Durable Object 하나에 1GB, 계정 전체 5GB)
 const SESSION_MS = 14 * 864e5;         // 로그인 유지 14일
-const LOCK_FAILS = 10, LOCK_IP_FAILS = 50, LOCK_MS = 5 * 60e3;
+const LOCK_FAILS = 10, LOCK_IP_FAILS = 50, LOCK_MS = 5 * 60e3;   // 5분 안에 10번(같은 접속 주소는 50번) 틀리면 잠근다
+const LOCK_HOLD = 60e3;                // 잠그는 시간 1분(2026-11-17 휴먼쌤 "잠김시간 1분으로", 앞은 5분)
+const AUTO_REALMS = ['fr', 'de', 'uk'];   // 나라 통합 로그인(?map=auto)이 찾는 영역. 가상융합(xr)은 관리 화면이 달라 넣지 않는다
 const FAILS_RESET = '20261025';        // 이 값을 바꿔 배포하면 그때 걸려 있던 잠금이 모두 풀린다
 const ORPHAN_MS = 6 * 3600e3;          // 올렸지만 교실에 저장하지 않은 사진은 6시간 뒤 그 교실을 저장할 때 지운다
 
@@ -239,7 +241,10 @@ export class Content {
         if (p.startsWith('/api/img/') && m === 'GET') return this.img(H, p.slice('/api/img/'.length));
         throw new E(404, 'notfound');
       }
-      const r = p.slice('/api/admin/'.length), realm = mapOf(url);   // 영역(fr·xr)마다 계정이 따로
+      const r = p.slice('/api/admin/'.length);
+      // 나라 통합 로그인(2026-11-17 휴먼쌤 "영국 아이디를 쓰면 영국 관리자로 들어가고 프랑스는 프랑스로"): 아이디로 나라를 찾는다
+      if (r === 'login' && m === 'POST' && url.searchParams.get('map') === 'auto') return this.out(H, await this.loginAuto(req));
+      const realm = mapOf(url);   // 영역(fr·xr)마다 계정이 따로
       if (r === 'state' && m === 'GET') return this.out(H, { ready: this.adminCount(realm) > 0, setup: this.setupOpen(realm) });
       if (r === 'setup' && m === 'POST') return this.out(H, await this.setup(req, realm));
       if (r === 'login' && m === 'POST') return this.out(H, await this.login(req, realm));
@@ -333,7 +338,7 @@ export class Content {
     const now = Date.now(), r = this.row('SELECT n, first FROM fails WHERE k = ?', k);
     const n = (!r || now - r.first > LOCK_MS) ? 1 : r.n + 1, first = (!r || now - r.first > LOCK_MS) ? now : r.first;
     this.run('INSERT INTO fails (k, n, first, until) VALUES (?, ?, ?, ?) ON CONFLICT(k) DO UPDATE SET n = excluded.n, first = excluded.first, until = excluded.until',
-      k, n, first, n >= max ? now + LOCK_MS : 0);
+      k, n, first, n >= max ? now + LOCK_HOLD : 0);
   }
   async putUser(name, role, schools, key) {
     const now = Date.now(), u = this.getUser(name);
@@ -381,6 +386,27 @@ export class Content {
     if (!ok) { this.fail(ipk, LOCK_IP_FAILS); this.fail(ukk); throw new E(401, 'login'); }
     this.run('DELETE FROM fails WHERE k = ?', ukk);
     return this.issue(uk);
+  }
+  // 아이디 · 비밀번호가 맞는 나라를 찾는다. 하나면 그 나라로 로그인, 둘 이상이면 고르게 나라 목록만 돌려준다(그때는 ?map=나라로 다시 로그인).
+  // 틀린 횟수는 '통합 로그인 한 번 = 한 번'으로 센다(나라 수만큼 쌓이지 않게)
+  async loginAuto(req) {
+    const b = await this.body(req);
+    const name = cleanUser(b.user), key = cleanKey(b.key);
+    const ipk = 'ip:' + this.ip(req), ak = 'u:auto:' + name;
+    this.lockCheck(ipk);
+    this.lockCheck(ak);
+    const ok = [];
+    for (const realm of AUTO_REALMS) {
+      const uk = ukey(realm, name), u = this.getUser(uk);
+      if (!u) continue;
+      this.lockCheck('u:' + uk);
+      if (same(await sha(u.salt + key), u.hash)) ok.push(uk);
+    }
+    if (!ok.length) { this.fail(ipk, LOCK_IP_FAILS); this.fail(ak); throw new E(401, 'login'); }
+    this.run('DELETE FROM fails WHERE k = ?', ak);
+    if (ok.length > 1) return { pick: ok.map(uk => splitKey(uk).realm) };
+    this.run('DELETE FROM fails WHERE k = ?', 'u:' + ok[0]);
+    return Object.assign(await this.issue(ok[0]), { realm: splitKey(ok[0]).realm });
   }
   async auth(req, realm) {
     const m = (req.headers.get('Authorization') || '').match(/^Bearer ([\w-]{20,80})$/);
