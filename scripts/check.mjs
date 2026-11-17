@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const DIR = path.resolve(process.argv[2] || '_site');
-const MUST = ['index.html', 'eu/index.html', 'de/index.html', 'uk/index.html', 'admin/index.html', 'lobby.js', 'lobby.config.js', 'room.js', 'relay.json'];
+const MUST = ['index.html', 'eu/index.html', 'fr/index.html', 'de/index.html', 'uk/index.html', 'admin/index.html', 'lobby.js', 'lobby.config.js', 'room.js', 'relay.json'];
 const TEXT = /\.(html?|js|mjs|css|json|txt|xml|svg|webmanifest|md)$|^_redirects$|^_headers$/i;
 const BAD = [
   [/sk-ant-[A-Za-z0-9_-]{16,}/, 'Anthropic 열쇠처럼 보임'],

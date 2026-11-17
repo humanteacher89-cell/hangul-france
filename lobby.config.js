@@ -3,7 +3,7 @@
 // 학교 목록: 하위 에이전트 웹 조사(2026-10-05, 자료\한글학교-목록.md → 10-06 실존 확인 자료\한글학교-실존확인-20261006.md, 20곳·소재지 좌표). 10-06 휴먼쌤 결정으로 숄레·디종·리옹 한글학교 3곳을 지도에서도 빼 17곳, 10-24 리옹 에콜리움도 뺐다가 10-25 휴먼쌤 "에콜리움 한글학교가 목록에 없어 이 공간을 만들어주고" → 다시 넣어 로비 학교 목록 정본은 17곳.
 window.LOBBY_CONFIG = {
   version: 'v0.2',
-  europeUrl: 'eu/',          // 학교 목록 아래 '유럽 지도로' 단추 → 유럽 입구. 10-31 유럽 한글학교 메타버스 공개(휴먼쌤 "확인 후 올려") 때 넣음
+  europeUrl: '../',          // 학교 목록 아래 '유럽 지도로' 단추 → 유럽 입구. 10-31 유럽 한글학교 메타버스 공개(휴먼쌤 "확인 후 올려") 때 넣음
   text: {
     title: '프랑스 한글학교 로비',                 // [확인 전]
     plaza: '만남의 광장',                          // [확인 전]
@@ -153,7 +153,7 @@ window.LOBBY_CONFIG = {
     return out.concat((T.quizBase || []).map(x => ({ q: x.q, choices: x.choices.slice(), answer: x.answer, note: x.note || '' })));
   },
   // 멀티플레이: 같은 폴더 relay.json의 중계 서버 주소를 읽는다(없으면 혼자 보기). 주소 ?mp=0 끔, ?mp=ws://…/ws 시험 서버
-  multiplayer: { file: 'relay.json', lobbyRoom: 'fr:lobby', roomPrefix: 'fr:', sendHz: 4 },   // sendHz: 움직일 때 초당 보내는 횟수(Cloudflare 무료 한도 때문에 낮게. 60명 예정이라 10-06 6 → 4)
+  multiplayer: { file: '../relay.json', lobbyRoom: 'fr:lobby', roomPrefix: 'fr:', sendHz: 4 },   // sendHz: 움직일 때 초당 보내는 횟수(Cloudflare 무료 한도 때문에 낮게. 60명 예정이라 10-06 6 → 4)
   // 말풍선 대화(2026-10-31 휴먼쌤 "채팅기능 넣어줘"): 정해진 한국어 표현만 고른다(자유 글 없음). 서버로는 번호만 가므로 순서를 바꾸지 말고 뒤에만 더한다. 독일·영국 로비와 같은 번호
   chat: {
     "groups": [

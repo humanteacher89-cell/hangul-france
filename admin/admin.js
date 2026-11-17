@@ -8,7 +8,7 @@
   const $ = id => document.getElementById(id);
   const Q = new URLSearchParams(location.search);
   const MAPS = {
-    fr: { cfg: '../lobby.config.js', lobby: '../' },
+    fr: { cfg: '../lobby.config.js', lobby: '../fr/' },
     de: { cfg: '../de/lobby.config.js', lobby: '../de/' },
     uk: { cfg: '../uk/lobby.config.js', lobby: '../uk/' }
   };
